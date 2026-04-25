@@ -1,22 +1,44 @@
-# Smart Resource Allocation
+# Karuna – Smart Resource Allocation
 
-Monorepo for the Smart Resource Allocation hackathon project.
+AI-powered monorepo for NGO smart resource allocation, relief coordination, volunteer matching, and community impact tracking.
 
 ## Structure
 
 ```text
-backend/   NestJS + Prisma + PostgreSQL + Gemini API
-frontend/  Expo React Native + TypeScript mobile app
-API TEST/  Local Gemini Vertex AI test folder; kept at repo root
+backend/   NestJS + Prisma + PostgreSQL + Gemini AI
+mobile/    Expo React Native + TypeScript mobile app
+web/       React + Vite + TypeScript admin dashboard
 ```
 
-## Commands
+## Quick Start
 
 ```bash
+# Install all dependencies
 npm install
-npm run backend:prisma:generate
+
+# Start the backend (NestJS)
 npm run backend:dev
-npm run frontend:start
+
+# Start the mobile app (Expo)
+npm run mobile:start
+
+# Start the web dashboard (Vite)
+npm run web:dev
 ```
 
-See `backend/README.md` and `frontend/README.md` for app-specific setup.
+## Web Dashboard Pages
+
+| Page           | Backend Endpoints Used                                |
+| -------------- | ----------------------------------------------------- |
+| Dashboard      | `/dashboard/*` – urgent-summary, completion-rates, map, active-volunteers, pending-reports |
+| Tasks          | `/tasks`, `/tasks/urgent`, `/tasks/:id/score`         |
+| Reports        | `/reports`, `/reports/sync`, `/reports/:id`            |
+| Assignments    | `/assignments`, `/assignments/:id/approve|complete|override` |
+| Volunteers     | `/volunteers`                                         |
+| Analytics      | `/analytics/impact-summary`, `/analytics/ngo-report`  |
+| Predictions    | `/predictions`, `/predictions/generate`               |
+| Notifications  | `/notifications`, `/notifications/:id/read`           |
+| Users          | `/users`, `/roles`, `/users/:id`                      |
+| Audit Logs     | `/audit-logs`                                         |
+
+See `backend/README.md`, `mobile/README.md`, and `web/.env.example` for app-specific setup.

@@ -6,8 +6,9 @@ dist
 coverage
 */coverage
 .expo
-frontend/.expo
-frontend/web-build
+mobile/.expo
+mobile/web-build
+web/dist
 
 # Environment and local secrets
 .env
@@ -20,11 +21,16 @@ backend/.env.*
 !backend/.env.example
 backend/.env.local
 backend/.env.*.local
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
-frontend/.env.local
-frontend/.env.*.local
+mobile/.env
+mobile/.env.*
+!mobile/.env.example
+mobile/.env.local
+mobile/.env.*.local
+web/.env
+web/.env.*
+!web/.env.example
+web/.env.local
+web/.env.*.local
 
 # Backend uploads
 backend/uploads/*
