@@ -1,55 +1,74 @@
-# Dependencies and build outputs
-node_modules
-*/node_modules
-dist
-*/dist
-coverage
-*/coverage
-.expo
-mobile/.expo
-mobile/web-build
-web/dist
+# Dependencies
+**/node_modules/
+**/bower_components/
+
+# Build outputs
+**/dist/
+**/build/
+**/out/
+**/.next/
+**/.expo/
+**/web-build/
+**/coverage/
+
+# Next.js
+.next/
+out/
+
+# Expo / React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig
+*.swp
+ios/
+android/
+**/ios/build/
+**/android/build/
 
 # Environment and local secrets
-.env
-.env.*
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
 !.env.example
-.env.local
-.env.*.local
-backend/.env
-backend/.env.*
-!backend/.env.example
-backend/.env.local
-backend/.env.*.local
-mobile/.env
-mobile/.env.*
-!mobile/.env.example
-mobile/.env.local
-mobile/.env.*.local
-web/.env
-web/.env.*
-!web/.env.example
-web/.env.local
-web/.env.*.local
 
-# Backend uploads
+# Logs
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Backend specific
 backend/uploads/*
 !backend/uploads/.gitkeep
 uploads/*
 !uploads/.gitkeep
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
 # Local Gemini / Google Vertex AI test credentials
 API TEST/
-API TEST/key.json
-API TEST/*.json.key
-API TEST/*.pem
-API TEST/*.p12
-API TEST/.env
-API TEST/.env.*
-API TEST/*.log
+
+# OS / Editor specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
