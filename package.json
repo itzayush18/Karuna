@@ -8,18 +8,18 @@
     "web"
   ],
   "overrides": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "@types/react": "18.3.12",
-    "@types/react-dom": "18.3.5",
-    "expo": "52.0.49",
-    "react-native": "0.76.9",
-    "react-native-reanimated": "3.16.7",
-    "metro": "0.81.5",
-    "metro-cache": "0.81.5",
-    "metro-config": "0.81.5",
-    "metro-core": "0.81.5",
-    "metro-resolver": "0.81.5"
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "expo": "55.0.17",
+    "react-native": "0.85.2",
+    "react-native-reanimated": "4.3.0",
+    "metro": "0.101.5",
+    "metro-cache": "0.101.5",
+    "metro-config": "0.101.5",
+    "metro-core": "0.101.5",
+    "metro-resolver": "0.101.5"
   },
   "scripts": {
     "backend:dev": "npm --workspace backend run start:dev",
