@@ -1,6 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+
 import * as ImagePicker from 'expo-image-picker';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -63,13 +63,9 @@ export function ReportSubmitScreen() {
     if (!result.canceled) Alert.alert('Image ready', 'Image capture is ready to attach to a backend report flow.');
   }
 
-  async function recordAudio() {
-    const permission = await Audio.requestPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Microphone needed', 'Allow microphone access to record Tamil or English voice notes.');
-      return;
-    }
-    Alert.alert('Recorder ready', 'Recording UI placeholder is ready for expo-av integration.');
+  function recordAudio() {
+    // expo-av is not available in Expo Go SDK 55 — requires a dev build
+    Alert.alert('Coming soon', 'Audio recording requires a development build. Use the text field for now.');
   }
 
   return (
