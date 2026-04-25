@@ -7,20 +7,39 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+export const GoogleColors = {
+  blue: '#4285F4',
+  red: '#EA4335',
+  yellow: '#FBBC05',
+  green: '#34A853',
+};
+
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
+    text: '#202124',
+    background: '#FFFFFF',
+    surface: '#F8F9FA',
+    primary: GoogleColors.blue,
+    success: GoogleColors.green,
+    warning: GoogleColors.yellow,
+    error: GoogleColors.red,
     backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    backgroundSelected: '#E8F0FE', // Light blue tint
+    textSecondary: '#5F6368',
+    border: '#DADCE0',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#E8EAED',
+    background: '#202124',
+    surface: '#292A2D',
+    primary: '#8AB4F8', // Lighter blue for dark mode
+    success: '#81C995', // Lighter green
+    warning: '#FDE293', // Lighter yellow
+    error: '#F28B82', // Lighter red
+    backgroundElement: '#3C4043',
+    backgroundSelected: '#303134',
+    textSecondary: '#9AA0A6',
+    border: '#5F6368',
   },
 } as const;
 
