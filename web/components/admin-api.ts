@@ -60,6 +60,19 @@ export async function apiPost<T>(ctx: RequestContext, path: string, body?: unkno
   return parseResponse<T>(response);
 }
 
+export async function authLogin(baseUrl: string, credentials: { email: string; password?: string }) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(credentials),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ accessToken: string }>(response);
+}
+
 export async function loadAdminData(ctx: RequestContext) {
   const operations = {
     urgentSummary: () => apiGet<AdminDataState["urgentSummary"]>(ctx, "/dashboard/urgent-summary"),
@@ -118,6 +131,10 @@ export async function scoreTask(ctx: RequestContext, taskId: string) {
 
 export async function processReport(ctx: RequestContext, reportId: string) {
   return apiPost<unknown>(ctx, `/ai/reports/${reportId}/process`);
+}
+
+export async function getGovernanceInsights(ctx: RequestContext) {
+  return apiGet<string>(ctx, "/analytics/governance-insights");
 }
 
 export async function markNotificationRead(ctx: RequestContext, id: string) {

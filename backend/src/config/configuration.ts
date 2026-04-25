@@ -8,7 +8,10 @@ export const configuration = () => ({
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview',
+    model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+    provider: process.env.GEMINI_PROVIDER ?? 'auto',
+    timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS ?? 30000),
+    maxRetries: Number(process.env.GEMINI_MAX_RETRIES ?? 2),
     useVertexAi: process.env.GEMINI_USE_VERTEX_AI === 'true',
     vertexProject: process.env.GEMINI_VERTEX_PROJECT,
     vertexLocation: process.env.GEMINI_VERTEX_LOCATION ?? 'us-central1',

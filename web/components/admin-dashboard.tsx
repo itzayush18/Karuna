@@ -8,6 +8,8 @@ import {
   processReport,
   scoreTask,
   suggestMatches,
+  authLogin,
+  getGovernanceInsights,
 } from "./admin-api";
 import { AdminHeader } from "./admin-header";
 import { FiltersBar } from "./filters-bar";
@@ -20,15 +22,20 @@ import {
   UrgencyPanel,
 } from "./feature-panels";
 import { KpiOverview } from "./kpi-overview";
-import { DashboardFilters, MatchSuggestion, RequestContext } from "./models";
+import { AdminDataState, DashboardFilters, MatchSuggestion, RequestContext } from "./models";
 import { OperationsPanel } from "./operations-panel";
+import { NavItem, Sidebar } from "./sidebar";
+import { StatsGrid } from "./stats-grid";
+import { ModernTable } from "./modern-table";
+
+import { Login } from "./login";
 
 const defaultFilters: DashboardFilters = {
   page: 1,
   limit: 20,
 };
 
-const initialState = {
+const initialState: AdminDataState = {
   urgentSummary: null,
   mapTasks: [],
   completionRates: null,
@@ -48,6 +55,7 @@ const initialState = {
   locations: [],
   auditLogs: [],
   aiLogs: [],
+  governanceInsights: "",
 };
 
 export function AdminDashboard() {
@@ -68,7 +76,15 @@ export function AdminDashboard() {
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedReportId, setSelectedReportId] = useState("");
   const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
-  const [activeView, setActiveView] = useState<"mission" | "operations">("mission");
+  const [activeItem, setActiveItem] = useState<NavItem>("overview");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      setIsAuthenticated(true);
+      refreshAll();
+    }
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("karuna.baseUrl", baseUrl);
@@ -83,8 +99,32 @@ export function AdminDashboard() {
     [baseUrl, token, filters],
   );
 
+  const handleLogin = async (url: string, credentials: { email: string; password?: string }) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      setBaseUrl(url);
+      const { accessToken } = await authLogin(url, credentials);
+      setToken(accessToken);
+      setIsAuthenticated(true);
+      // Trigger refresh after setting state
+      setTimeout(() => refreshAll(), 100);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken("");
+    setIsAuthenticated(false);
+    window.localStorage.removeItem("karuna.token");
+  };
+
   const refreshAll = useCallback(async () => {
-    if (!token.trim()) {
+    const currentToken = window.localStorage.getItem("karuna.token") || token;
+    if (!currentToken.trim()) {
       setMessage("Enter a valid JWT token to fetch backend modules.");
       return;
     }
@@ -92,8 +132,9 @@ export function AdminDashboard() {
     setLoading(true);
     setMessage("");
     try {
-      const result = await loadAdminData(context);
-      setData((prev) => ({ ...prev, ...result.data }));
+      const result = await loadAdminData({ ...context, token: currentToken });
+      const insights = await getGovernanceInsights({ ...context, token: currentToken });
+      setData((prev) => ({ ...prev, ...result.data, governanceInsights: insights }));
       setErrors(result.errors);
       setLastRefresh(new Date().toLocaleTimeString());
       const failures = Object.keys(result.errors).length;
@@ -129,66 +170,13 @@ export function AdminDashboard() {
 
   const errorCount = Object.keys(errors).length;
 
-  return (
-    <div className="karuna-shell px-4 py-6 md:px-8 lg:px-12">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <AdminHeader connected={token.length > 0} loading={loading} lastRefresh={lastRefresh} />
-
-        <FiltersBar
-          baseUrl={baseUrl}
-          token={token}
-          filters={filters}
-          loading={loading}
-          onBaseUrlChange={setBaseUrl}
-          onTokenChange={setToken}
-          onFilterChange={updateFilter}
-          onRefresh={refreshAll}
-        />
-
-        <section className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={activeView === "mission" ? "tab-pill tab-pill-active" : "tab-pill"}
-            onClick={() => setActiveView("mission")}
-          >
-            Mission Intelligence View
-          </button>
-          <button
-            type="button"
-            className={activeView === "operations" ? "tab-pill tab-pill-active" : "tab-pill"}
-            onClick={() => setActiveView("operations")}
-          >
-            Admin Operations View
-          </button>
-          {errorCount ? (
-            <span className="rounded-full bg-[#fce8e6] px-3 py-1 text-xs font-semibold text-[#c5221f]">
-              {errorCount} modules failed
-            </span>
-          ) : null}
-        </section>
-
-        {message ? (
-          <section className="card-soft p-4 text-sm text-slate-700">{message}</section>
-        ) : null}
-
-        <KpiOverview data={data} />
-
-        {activeView === "mission" ? (
-          <>
-            <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-              <DataCollectionPanel
-                reports={data.reports}
-                pendingReports={data.pendingReports}
-                aiLogs={data.aiLogs}
-                selectedReportId={selectedReportId}
-                onSelectReportId={setSelectedReportId}
-                onProcessReport={() =>
-                  runAction("AI processing", async () => {
-                    if (!selectedReportId.trim()) throw new Error("Provide a report ID.");
-                    await processReport(context, selectedReportId);
-                  })
-                }
-              />
+  const renderContent = () => {
+    switch (activeItem) {
+      case "overview":
+        return (
+          <div className="flex flex-col gap-6">
+            <StatsGrid data={data} />
+            <div className="grid gap-6 xl:grid-cols-2">
               <UrgencyPanel
                 mapTasks={data.mapTasks}
                 urgentTasks={data.urgentTasks}
@@ -202,9 +190,55 @@ export function AdminDashboard() {
                   })
                 }
               />
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+              <PredictionsPanel
+                predictions={data.predictions}
+                onGenerate={() => runAction("Prediction generation", () => generatePredictions(context))}
+              />
+            </div>
+            <ImpactPanel impactSummary={data.impactSummary} ngoReport={data.ngoReport} />
+          </div>
+        );
+      case "reports":
+        return (
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-6 xl:grid-cols-2">
+              <DataCollectionPanel
+                reports={data.reports}
+                pendingReports={data.pendingReports}
+                aiLogs={data.aiLogs}
+                selectedReportId={selectedReportId}
+                onSelectReportId={setSelectedReportId}
+                onProcessReport={() =>
+                  runAction("AI processing", async () => {
+                    if (!selectedReportId.trim()) throw new Error("Provide a report ID.");
+                    await processReport(context, selectedReportId);
+                  })
+                }
+              />
+              <ModernTable
+                title="Recent Reports"
+                columns={[
+                  { header: "ID", accessor: (item) => item.id.slice(0, 8) + "..." },
+                  { header: "Source", accessor: "source" },
+                  { header: "Status", accessor: (item) => (
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                      item.processingStatus === 'PROCESSED' ? 'bg-green-100 text-green-700' : 
+                      item.processingStatus === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {item.processingStatus}
+                    </span>
+                  )},
+                ]}
+                data={data.reports.slice(0, 10)}
+                onRowClick={(item) => setSelectedReportId(item.id)}
+              />
+            </div>
+          </div>
+        );
+      case "tasks":
+        return (
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-6 xl:grid-cols-2">
               <MatchingPanel
                 volunteers={data.volunteers}
                 selectedTaskId={selectedTaskId}
@@ -218,21 +252,46 @@ export function AdminDashboard() {
                   })
                 }
               />
-              <PredictionsPanel
-                predictions={data.predictions}
-                onGenerate={() => runAction("Prediction generation", () => generatePredictions(context))}
+              <ModernTable
+                title="Active Tasks"
+                columns={[
+                  { header: "Title", accessor: "title" },
+                  { header: "Status", accessor: (item) => (
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                      item.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {item.status}
+                    </span>
+                  )},
+                ]}
+                data={data.tasks.slice(0, 10)}
+                onRowClick={(item) => setSelectedTaskId(item.id)}
               />
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-              <EngagementPanel
-                activeVolunteers={data.activeVolunteers}
-                notificationsUnread={data.notifications.filter((item) => !item.readAt).length}
-              />
-              <ImpactPanel impactSummary={data.impactSummary} ngoReport={data.ngoReport} />
-            </section>
-          </>
-        ) : (
+            </div>
+          </div>
+        );
+      case "volunteers":
+        return (
+          <div className="flex flex-col gap-6">
+            <EngagementPanel
+              activeVolunteers={data.activeVolunteers}
+              notificationsUnread={data.notifications.filter((item) => !item.readAt).length}
+            />
+            <ModernTable
+              title="Volunteer Roster"
+              columns={[
+                { header: "Name", accessor: (item) => item.user?.fullName ?? "Unknown" },
+                { header: "Points", accessor: "points" },
+                { header: "Perf", accessor: (item) => item.performanceScore?.toFixed(2) ?? "0.00" },
+              ]}
+              data={data.volunteers}
+            />
+          </div>
+        );
+      case "users":
+      case "ai":
+      case "audit":
+        return (
           <OperationsPanel
             users={data.users}
             roles={data.roles}
@@ -244,8 +303,62 @@ export function AdminDashboard() {
               runAction("Notification update", () => markNotificationRead(context, id))
             }
           />
-        )}
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} loading={loading} />;
+  }
+
+  return (
+    <div className="karuna-shell min-h-screen">
+      <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
+      
+      <main className="lg:ml-64 p-6 md:p-8 lg:p-10">
+        <div className="mx-auto max-w-7xl">
+          <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="section-title text-3xl font-extrabold tracking-tight text-slate-900">
+                {activeItem.charAt(0).toUpperCase() + activeItem.slice(1)}
+              </h1>
+              <p className="mt-1 text-slate-500">
+                Karuna Mission Control Center
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleLogout}
+                className="btn-premium-secondary flex items-center gap-2"
+              >
+                Logout
+              </button>
+              <button
+                onClick={refreshAll}
+                disabled={loading}
+                className="btn-premium-primary flex items-center gap-2 shadow-sm"
+              >
+                {loading ? "Syncing..." : "Refresh"}
+              </button>
+            </div>
+          </header>
+
+          {message && (
+            <div className="mb-8 animate-fade-in rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-sm text-blue-700 shadow-sm backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                <span className="font-medium">{message}</span>
+              </div>
+            </div>
+          )}
+
+          {renderContent()}
+        </div>
       </main>
     </div>
   );
 }
+
+

@@ -22,92 +22,87 @@ export function FiltersBar({
   onRefresh,
 }: Props) {
   return (
-    <section className="card p-5 md:p-6">
-      <h2 className="section-title text-xl font-semibold">Backend Connection and Filters</h2>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm">
-          <span className="font-medium text-slate-600">Backend URL</span>
-          <input
-            className="control-input"
-            value={baseUrl}
-            onChange={(event) => onBaseUrlChange(event.target.value)}
-            placeholder="http://localhost:3000"
-          />
-        </label>
-        <label className="flex flex-col gap-2 text-sm">
-          <span className="font-medium text-slate-600">JWT Bearer Token</span>
-          <input
-            className="control-input"
-            value={token}
-            onChange={(event) => onTokenChange(event.target.value)}
-            placeholder="Paste token from /auth/login"
-            type="password"
-          />
-        </label>
+    <section className="card-premium p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="section-title text-xl">Mission Filters</h2>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] font-bold uppercase text-slate-400">Live API Data Feed</span>
+        </div>
       </div>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          Area
+      
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Area</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
             value={filters.area ?? ""}
             onChange={(event) => onFilterChange("area", event.target.value)}
+            placeholder="All Areas"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          Category
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
             value={filters.category ?? ""}
             onChange={(event) => onFilterChange("category", event.target.value)}
+            placeholder="All Categories"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          Status
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
             value={filters.status ?? ""}
             onChange={(event) => onFilterChange("status", event.target.value)}
+            placeholder="Any Status"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          NGO ID
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Organization</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
             value={filters.ngoId ?? ""}
             onChange={(event) => onFilterChange("ngoId", event.target.value)}
+            placeholder="Any NGO"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          From (ISO)
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">From</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
+            type="date"
             value={filters.from ?? ""}
             onChange={(event) => onFilterChange("from", event.target.value)}
-            placeholder="2026-01-01"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-          To (ISO)
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">To</label>
           <input
-            className="control-input"
+            className="input-premium py-2 text-sm"
+            type="date"
             value={filters.to ?? ""}
             onChange={(event) => onFilterChange("to", event.target.value)}
-            placeholder="2026-12-31"
           />
-        </label>
+        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={onRefresh} disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh All Backend Modules"}
+      <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-4">
+        <p className="text-xs text-slate-400 italic">
+          Filtering across reports, tasks, predictions, and audit logs.
+        </p>
+        <button 
+          type="button" 
+          className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+          onClick={() => {
+            // Reset logic if needed
+          }}
+        >
+          Clear All Filters
         </button>
-        <span className="text-xs text-slate-500">
-          This panel drives data for dashboard, analytics, tasks, reports, predictions,
-          directory, notifications, locations, and audit logs.
-        </span>
       </div>
     </section>
   );
 }
+

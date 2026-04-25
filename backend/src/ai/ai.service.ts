@@ -7,21 +7,33 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ExtractedReportPayload, extractedReportSchema } from './extraction.schema';
 import { existsSync, readFileSync } from 'node:fs';
 
+type GeminiProvider = 'auto' | 'api_key' | 'vertex';
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly model: string;
+  private readonly provider: GeminiProvider;
+  private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly usingVertexAi: boolean;
   private readonly client?: GoogleGenAI;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.model = config.get<string>('gemini.model', 'gemini-3-flash-preview');
+    this.model = config.get<string>('gemini.model', 'gemini-2.0-flash');
+    this.provider = (config.get<string>('gemini.provider', 'auto') as GeminiProvider) ?? 'auto';
+    this.timeoutMs = config.get<number>('gemini.timeoutMs', 30_000);
+    this.maxRetries = Math.max(1, config.get<number>('gemini.maxRetries', 2));
     const apiKey = config.get<string>('gemini.apiKey');
     const useVertexAi = config.get<boolean>('gemini.useVertexAi', false);
     const googleCredentials = config.get<string>('gemini.googleCredentials');
-    if (useVertexAi) {
+    const preferVertex = this.provider === 'vertex' || (this.provider === 'auto' && useVertexAi && !apiKey);
+    this.usingVertexAi = preferVertex;
+
+    if (preferVertex) {
       if (googleCredentials && existsSync(googleCredentials)) {
         process.env.GOOGLE_APPLICATION_CREDENTIALS = googleCredentials;
       }
@@ -33,6 +45,22 @@ export class AiService {
     } else {
       this.client = apiKey ? new GoogleGenAI({ apiKey }) : undefined;
     }
+
+    if (!this.client) {
+      this.logger.warn('Gemini client is not configured. AI will use deterministic fallback extraction.');
+    }
+  }
+
+  status() {
+    return {
+      configured: Boolean(this.client),
+      provider: this.usingVertexAi ? 'vertex' : 'api_key',
+      selectedProviderMode: this.provider,
+      model: this.model,
+      timeoutMs: this.timeoutMs,
+      maxRetries: this.maxRetries,
+      fallbackMode: !this.client,
+    };
   }
 
   async processReport(reportId: string) {
@@ -169,6 +197,49 @@ export class AiService {
     }
   }
 
+  async generateGovernanceInsights(data: {
+    recentLogs: any[];
+    userStats: any;
+    taskStats: any;
+  }) {
+    if (!this.client) {
+      return "AI Governance insights are unavailable. Configure Gemini API key to enable this feature.";
+    }
+
+    const prompt = `
+      You are a Governance AI for Karuna, a humanitarian platform. 
+      Analyze the following system activity data and provide 3-4 concise, high-value insights for administrators.
+      Focus on patterns of activity, potential bottlenecks, or security/audit highlights.
+      
+      DATA:
+      - Recent Audit Logs: ${JSON.stringify(data.recentLogs)}
+      - User Distribution: ${JSON.stringify(data.userStats)}
+      - Task Status Summary: ${JSON.stringify(data.taskStats)}
+      
+      FORMAT:
+      - Return a concise paragraph (max 150 words).
+      - Sound professional, analytical, and supportive.
+      - If there are anomalies (like many deletes or login failures), point them out.
+    `;
+
+    try {
+      const response = await this.callGeminiWithRetry({
+        model: this.model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+        },
+      } as never);
+
+      return response.text ?? "Unable to synthesize governance insights at this time.";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Governance insight generation failed: ${message}`);
+      return "The AI governance engine is currently experiencing high load. Please check back later.";
+    }
+  }
+
   private async extractWithGemini(report: {
     source: ReportSource;
     rawText: string | null;
@@ -188,7 +259,7 @@ export class AiService {
       parts.push({ inlineData: { mimeType: media.mimeType, data } });
     }
 
-    const response = await this.client!.models.generateContent({
+    const response = await this.callGeminiWithRetry({
       model: this.model,
       contents: [{ role: 'user', parts }],
       config: {
@@ -197,18 +268,68 @@ export class AiService {
       },
     } as never);
 
-    return extractedReportSchema.parse(JSON.parse(response.text ?? '{}'));
+    return this.normalizeExtraction(JSON.parse(response.text ?? '{}'));
   }
 
   private extractionPrompt() {
     return [
-      'Extract a community aid report from noisy Tamil/English/mixed input.',
-      'Inputs may include paper survey photos, WhatsApp-style text, forms, or voice notes.',
-      'For voice notes, transcribe and understand the audio before extraction.',
-      'Return strict JSON only matching the provided schema.',
-      'Identify location, category, affected people, urgency clues, language, summary, confidence, vulnerability indicators, unresolved and recurrence clues.',
-      'If values are missing, infer cautiously, keep the summary transparent, and lower confidence.',
+      'You are extracting community aid needs from noisy Tamil, English, or mixed-language field inputs.',
+      'Inputs can include survey photos, WhatsApp-style short text, forms, and voice-note media.',
+      'Return strict JSON only, matching the provided schema exactly with no extra keys.',
+      'Prefer Tamil Nadu geography when state or district context is implicit in village names.',
+      'Set confidence lower when details are inferred from ambiguous or short input.',
+      'Map urgency clues and vulnerable groups conservatively, but do not omit plausible risk indicators.',
+      'Keep summary concise, factual, and neutral for NGO operations dashboards.',
     ].join(' ');
+  }
+
+  private async callGeminiWithRetry(request: unknown) {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        const response = await this.withTimeout(
+          this.client!.models.generateContent(request as never),
+          this.timeoutMs,
+          `Gemini request timed out after ${this.timeoutMs}ms`,
+        );
+        return response;
+      } catch (error) {
+        lastError = error;
+        if (attempt < this.maxRetries) {
+          const delayMs = attempt * 450;
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+    return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      promise
+        .then((value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        })
+        .catch((error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+    });
+  }
+
+  private normalizeExtraction(payload: unknown): ExtractedReportPayload {
+    const parsed = extractedReportSchema.parse(payload);
+    return {
+      ...parsed,
+      affectedPeople: Math.max(1, parsed.affectedPeople),
+      severity: Math.max(1, Math.min(5, parsed.severity)),
+      urgencyClues: parsed.urgencyClues.slice(0, 12),
+      vulnerableGroups: parsed.vulnerableGroups.slice(0, 12),
+      summary: parsed.summary.slice(0, 500),
+      confidence: Math.max(0, Math.min(1, Number(parsed.confidence.toFixed(3)))),
+    };
   }
 
   private sanitizeError(error: unknown) {
@@ -226,7 +347,7 @@ export class AiService {
           ? 'FOOD'
           : 'OTHER';
     const affectedPeople = Number(lower.match(/(\d+)\s*(people|families|persons|members)?/)?.[1] ?? 1);
-    return {
+    return this.normalizeExtraction({
       location: { village: 'Demo Village', district: 'Demo District', state: 'Tamil Nadu', latitude: null, longitude: null },
       category,
       affectedPeople,
@@ -241,6 +362,6 @@ export class AiService {
       language: /[\u0B80-\u0BFF]/.test(text) ? 'ta' : 'en',
       summary: text.slice(0, 240) || 'Demo report created from structured form data',
       confidence: 0.45,
-    };
+    });
   }
 }

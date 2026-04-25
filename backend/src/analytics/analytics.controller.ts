@@ -20,4 +20,9 @@ export class AnalyticsController {
   ngoReport(@Query() query: DashboardFilterDto) {
     return this.analytics.ngoReport(query);
   }
+
+  @Get('governance-insights')
+  governanceInsights() {
+    return this.analytics.governanceInsights();
+  }
 }

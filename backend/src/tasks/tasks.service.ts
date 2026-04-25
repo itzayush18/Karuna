@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { optionalDateRangeWhere, paginationArgs } from '../common/dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UrgencyService } from '../urgency/urgency.service';
+import { AuditService } from '../audit/audit.service';
 import { TaskQueryDto } from './dto';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly urgency: UrgencyService,
+    private readonly audit: AuditService,
   ) {}
 
   list(query: TaskQueryDto) {
@@ -50,7 +52,15 @@ export class TasksService {
     return tasks.sort((a, b) => (b.urgencyScores[0]?.score ?? 0) - (a.urgencyScores[0]?.score ?? 0));
   }
 
-  score(taskId: string) {
-    return this.urgency.scoreTask(taskId);
+  async score(taskId: string, userId?: string) {
+    const result = await this.urgency.scoreTask(taskId);
+    await this.audit.record({
+      actorId: userId,
+      action: 'PROCESS',
+      entityType: 'Task',
+      entityId: taskId,
+      after: result,
+    });
+    return result;
   }
 }

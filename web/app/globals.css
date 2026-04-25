@@ -1,12 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f9fc;
-  --foreground: #1f1f1f;
+  --background: #f8fafc;
+  --foreground: #0f172a;
   --surface: #ffffff;
-  --surface-soft: #eef3fd;
-  --line: #dce4f2;
-  --primary-blue: #1a73e8;
+  --surface-soft: #f1f5f9;
+  --line: #e2e8f0;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #dbeafe;
+  --secondary: #64748b;
+  --accent: #8b5cf6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  
+  /* Google Colors */
+  --google-blue: #4285f4;
   --google-red: #ea4335;
   --google-yellow: #fbbc05;
   --google-green: #34a853;
@@ -23,110 +35,170 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-jakarta-sans), "Segoe UI", sans-serif;
+  overflow-x: hidden;
 }
 
 .karuna-shell {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 8% 4%, rgba(26, 115, 232, 0.15), transparent 36%),
-    radial-gradient(circle at 92% 7%, rgba(234, 67, 53, 0.12), transparent 34%),
-    radial-gradient(circle at 70% 96%, rgba(52, 168, 83, 0.14), transparent 42%),
+  background: 
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 0% 100%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
     var(--background);
 }
 
-.card {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 20px;
-  box-shadow: 0 6px 24px rgba(31, 31, 31, 0.06);
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
 }
 
-.card-soft {
+.card-premium {
+  background: var(--surface);
   border: 1px solid var(--line);
-  background: var(--surface-soft);
-  border-radius: 20px;
+  border-radius: 24px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-premium:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
 }
 
 .section-title {
   font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
-  letter-spacing: -0.03em;
-}
-
-.symbol-chip {
-  height: 36px;
-  width: 36px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  letter-spacing: -0.02em;
   font-weight: 700;
-  color: #fff;
 }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
+.btn-premium-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
 }
 
-.control-input {
-  width: 100%;
-  border: 1px solid var(--line);
-  background: #fff;
+.btn-premium-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.23);
+  opacity: 0.9;
+}
+
+.btn-premium-secondary {
+  background: var(--surface);
   color: var(--foreground);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 14px;
+  border: 1px solid var(--line);
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-premium-secondary:hover {
+  background: var(--surface-soft);
+  border-color: var(--secondary);
+}
+
+.input-premium {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: all 0.2s ease;
   outline: none;
 }
 
-.control-input:focus {
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.16);
+.input-premium:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
-.btn-primary {
-  border: none;
-  border-radius: 999px;
-  background: var(--primary-blue);
-  color: #fff;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 600;
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  color: var(--secondary);
+  font-weight: 500;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.btn-secondary {
+.sidebar-item:hover {
+  background: var(--surface-soft);
+  color: var(--primary);
+}
+
+.sidebar-item-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.kpi-card {
+  padding: 1.5rem;
+  border-radius: 24px;
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--foreground);
-  padding: 10px 16px;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+.tab-button {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
   font-weight: 600;
-  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.btn-primary:disabled,
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.tab-button-active {
+  background: var(--primary);
+  color: white;
 }
 
-.tab-pill {
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #fff;
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5563;
-  cursor: pointer;
+.tab-button-inactive {
+  color: var(--secondary);
 }
 
-.tab-pill-active {
-  background: #e8f0fe;
-  border-color: #d2e3fc;
-  color: #174ea6;
+.tab-button-inactive:hover {
+  background: var(--surface-soft);
 }
+

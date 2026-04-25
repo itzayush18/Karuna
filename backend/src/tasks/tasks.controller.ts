@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -25,7 +26,7 @@ export class TasksController {
 
   @Post(':id/score')
   @Roles('ADMIN', 'COORDINATOR')
-  score(@Param('id') id: string) {
-    return this.tasks.score(id);
+  score(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.tasks.score(id, user.sub);
   }
 }

@@ -31,4 +31,10 @@ export class AiController {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  @Get('status')
+  @Roles('ADMIN', 'COORDINATOR')
+  status() {
+    return this.ai.status();
+  }
 }

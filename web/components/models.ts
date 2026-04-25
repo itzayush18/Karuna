@@ -160,6 +160,7 @@ export interface AdminDataState {
   locations: Dict[];
   auditLogs: Dict[];
   aiLogs: Dict[];
+  governanceInsights: string;
 }
 
 export interface RequestContext {
