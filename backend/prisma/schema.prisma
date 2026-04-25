@@ -1,0 +1,458 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  ADMIN
+  COORDINATOR
+  FIELD_WORKER
+  VOLUNTEER
+  VIEWER
+}
+
+enum ReportSource {
+  TEXT
+  FORM
+  IMAGE
+  AUDIO
+  SYNC
+}
+
+enum SyncStatus {
+  LOCAL_PENDING
+  SYNCED
+  DUPLICATE
+  FAILED
+}
+
+enum ProcessingStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  TRANSCRIPTION_REQUIRED
+  FAILED
+}
+
+enum NeedCategory {
+  FOOD
+  WATER
+  MEDICAL
+  SHELTER
+  SANITATION
+  EDUCATION
+  TRANSPORT
+  OTHER
+}
+
+enum TaskStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  PROPOSED
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  OVERRIDDEN
+  CANCELLED
+}
+
+enum NotificationType {
+  URGENT_NEED
+  ASSIGNMENT
+  ESCALATION
+  SYSTEM
+}
+
+enum PredictionType {
+  FOOD_SHORTAGE
+  WATER_SHORTAGE
+  MEDICAL_DEMAND
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  OVERRIDE
+  CLOSE
+  LOGIN
+  PROCESS
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        RoleName     @unique
+  description String?
+  permissions Permission[]
+  users       User[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  roles     Role[]
+  createdAt DateTime @default(now())
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("NGO")
+  phone       String?
+  email       String?
+  address     String?
+  users       User[]
+  reports     CommunityReport[]
+  tasks       Task[]
+  predictions Prediction[]
+  metrics     ImpactMetric[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  fullName       String
+  phone          String?
+  roleId         String
+  role           Role            @relation(fields: [roleId], references: [id])
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+  volunteer      Volunteer?
+  reports        CommunityReport[] @relation("ReportCreator")
+  assignments    Assignment[]      @relation("AssignmentApprover")
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Volunteer {
+  id             String                    @id @default(cuid())
+  userId         String                    @unique
+  user           User                      @relation(fields: [userId], references: [id])
+  homeLocationId String?
+  homeLocation   Location?                 @relation(fields: [homeLocationId], references: [id])
+  maxWeeklyHours Int                       @default(12)
+  workloadScore  Int                       @default(0)
+  fatigueScore   Int                       @default(0)
+  performanceScore Float                   @default(0.75)
+  taskPreferences NeedCategory[]
+  skills         VolunteerSkill[]
+  languages      VolunteerLanguage[]
+  availability   VolunteerAvailability[]
+  assignments    Assignment[]
+  history        TaskHistory[]
+  points         Int                       @default(0)
+  badges         String[]                  @default([])
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+}
+
+model Skill {
+  id         String           @id @default(cuid())
+  name       String           @unique
+  volunteers VolunteerSkill[]
+  tasks      TaskSkill[]
+}
+
+model Language {
+  id         String              @id @default(cuid())
+  name       String              @unique
+  code       String              @unique
+  volunteers VolunteerLanguage[]
+}
+
+model VolunteerSkill {
+  volunteerId String
+  skillId     String
+  level       Int       @default(3)
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
+  skill       Skill     @relation(fields: [skillId], references: [id])
+
+  @@id([volunteerId, skillId])
+}
+
+model VolunteerLanguage {
+  volunteerId String
+  languageId  String
+  proficiency Int       @default(3)
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
+  language    Language  @relation(fields: [languageId], references: [id])
+
+  @@id([volunteerId, languageId])
+}
+
+model VolunteerAvailability {
+  id          String    @id @default(cuid())
+  volunteerId String
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
+  dayOfWeek   Int
+  startsAt    String
+  endsAt      String
+  active      Boolean   @default(true)
+}
+
+model Location {
+  id             String            @id @default(cuid())
+  village        String
+  district       String
+  state          String
+  latitude       Float?
+  longitude      Float?
+  isolationScore Int               @default(0)
+  reports        CommunityReport[]
+  tasks          Task[]
+  volunteers     Volunteer[]
+  predictions    Prediction[]
+  weatherSignals WeatherSignal[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([village, district, state])
+}
+
+model CommunityReport {
+  id             String                 @id @default(cuid())
+  organizationId String?
+  organization   Organization?          @relation(fields: [organizationId], references: [id])
+  createdById    String?
+  createdBy      User?                  @relation("ReportCreator", fields: [createdById], references: [id])
+  locationId     String?
+  location       Location?              @relation(fields: [locationId], references: [id])
+  source         ReportSource
+  rawText        String?
+  formData       Json?
+  idempotencyKey String?
+  clientRecordId String?
+  deviceId       String?
+  syncStatus     SyncStatus             @default(SYNCED)
+  processingStatus ProcessingStatus     @default(UPLOADED)
+  extracted      ExtractedReportField?
+  media          MediaFile[]
+  tasks          Task[]
+  aiLogs         AiProcessingLog[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([createdById, idempotencyKey])
+  @@index([organizationId, syncStatus, createdAt])
+}
+
+model ExtractedReportField {
+  id                 String       @id @default(cuid())
+  reportId           String       @unique
+  report             CommunityReport @relation(fields: [reportId], references: [id])
+  category           NeedCategory
+  affectedPeople     Int          @default(1)
+  severity           Int          @default(3)
+  language           String
+  summary            String
+  urgencyClues       String[]     @default([])
+  vulnerableGroups   String[]     @default([])
+  childrenInvolved   Boolean      @default(false)
+  elderlyInvolved    Boolean      @default(false)
+  medicallyFragile   Boolean      @default(false)
+  recurringIssue     Boolean      @default(false)
+  unresolved         Boolean      @default(true)
+  confidence         Float        @default(0)
+  rawJson            Json
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model MediaFile {
+  id               String           @id @default(cuid())
+  reportId         String
+  report           CommunityReport  @relation(fields: [reportId], references: [id])
+  originalName     String
+  storedName       String
+  mimeType         String
+  sizeBytes        Int
+  storagePath      String
+  publicUrl        String?
+  mediaType        String
+  processingStatus ProcessingStatus @default(UPLOADED)
+  transcript       String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Task {
+  id             String          @id @default(cuid())
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+  reportId       String?
+  report         CommunityReport? @relation(fields: [reportId], references: [id])
+  locationId     String?
+  location       Location?       @relation(fields: [locationId], references: [id])
+  title          String
+  description    String
+  category       NeedCategory
+  affectedPeople Int             @default(1)
+  requiredVolunteers Int         @default(1)
+  status         TaskStatus      @default(OPEN)
+  dueAt          DateTime?
+  skills         TaskSkill[]
+  assignments    Assignment[]
+  histories      TaskHistory[]
+  urgencyScores  UrgencyScore[]
+  impactMetrics  ImpactMetric[]
+  feedback       Feedback[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model TaskSkill {
+  taskId  String
+  skillId String
+  task    Task   @relation(fields: [taskId], references: [id])
+  skill   Skill  @relation(fields: [skillId], references: [id])
+
+  @@id([taskId, skillId])
+}
+
+model Assignment {
+  id            String           @id @default(cuid())
+  taskId        String
+  task          Task             @relation(fields: [taskId], references: [id])
+  volunteerId   String
+  volunteer     Volunteer        @relation(fields: [volunteerId], references: [id])
+  status        AssignmentStatus @default(PROPOSED)
+  matchScore    Float
+  explanation   Json
+  approvedById  String?
+  approvedBy    User?            @relation("AssignmentApprover", fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  completedAt   DateTime?
+  overrideReason String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model TaskHistory {
+  id          String     @id @default(cuid())
+  taskId      String
+  task        Task       @relation(fields: [taskId], references: [id])
+  volunteerId String?
+  volunteer   Volunteer? @relation(fields: [volunteerId], references: [id])
+  status      TaskStatus
+  note        String?
+  createdAt   DateTime   @default(now())
+}
+
+model UrgencyScore {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  score       Int
+  breakdown   Json
+  calculatedAt DateTime @default(now())
+}
+
+model ImpactMetric {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  taskId         String?
+  task           Task?         @relation(fields: [taskId], references: [id])
+  metricType     String
+  metricValue    Float
+  unit           String
+  recordedAt     DateTime      @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  rating    Int?
+  comment   String?
+  updates   Json?
+  createdAt DateTime @default(now())
+}
+
+model AiProcessingLog {
+  id           String           @id @default(cuid())
+  reportId     String?
+  report       CommunityReport? @relation(fields: [reportId], references: [id])
+  model        String
+  promptVersion String
+  requestType  String
+  status       ProcessingStatus
+  latencyMs    Int?
+  confidence   Float?
+  error        String?
+  responseJson Json?
+  createdAt    DateTime         @default(now())
+}
+
+model Prediction {
+  id             String         @id @default(cuid())
+  organizationId String?
+  organization   Organization?  @relation(fields: [organizationId], references: [id])
+  locationId     String?
+  location       Location?      @relation(fields: [locationId], references: [id])
+  type           PredictionType
+  title          String
+  confidence     Float
+  explanation    Json
+  signalWindow   String
+  createdAt      DateTime       @default(now())
+  expiresAt      DateTime?
+}
+
+model WeatherSignal {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
+  signalType  String
+  value       Float
+  unit        String
+  observedAt  DateTime
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String?
+  user      User?            @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  actorId     String?
+  actor       User?       @relation(fields: [actorId], references: [id])
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+}

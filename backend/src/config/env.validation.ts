@@ -1,0 +1,24 @@
+import * as Joi from 'joi';
+
+export const validationSchema = Joi.object({
+  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  PORT: Joi.number().default(3000),
+  DATABASE_URL: Joi.string().required(),
+  JWT_SECRET: Joi.string().min(16).required(),
+  JWT_EXPIRES_IN: Joi.string().default('1d'),
+  GEMINI_API_KEY: Joi.string().allow('').optional(),
+  GEMINI_MODEL: Joi.string().default('gemini-3-flash-preview'),
+  GEMINI_USE_VERTEX_AI: Joi.boolean().truthy('true').falsy('false').default(false),
+  GEMINI_VERTEX_PROJECT: Joi.string().allow('').optional(),
+  GEMINI_VERTEX_LOCATION: Joi.string().default('us-central1'),
+  GOOGLE_APPLICATION_CREDENTIALS: Joi.string().allow('').optional(),
+  UPLOAD_DIR: Joi.string().default('uploads'),
+  MAX_FILE_SIZE_MB: Joi.number().default(20),
+  PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  CLOUDFLARE_R2_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  CLOUDFLARE_R2_ACCOUNT_ID: Joi.string().allow('').optional(),
+  CLOUDFLARE_R2_ACCESS_KEY_ID: Joi.string().allow('').optional(),
+  CLOUDFLARE_R2_SECRET_ACCESS_KEY: Joi.string().allow('').optional(),
+  CLOUDFLARE_R2_BUCKET: Joi.string().allow('').optional(),
+  CLOUDFLARE_R2_PUBLIC_BASE_URL: Joi.string().allow('').uri().optional(),
+});

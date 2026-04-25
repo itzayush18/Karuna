@@ -1,0 +1,32 @@
+{
+  "name": "smart-resource-allocation-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "overrides": {
+    "react-native": "0.76.9",
+    "react-native-reanimated": "3.16.7",
+    "metro": "0.81.5",
+    "metro-config": "0.81.5",
+    "metro-core": "0.81.5",
+    "metro-resolver": "0.81.5",
+    "metro-transform-worker": "0.81.5"
+  },
+  "scripts": {
+    "backend:dev": "npm --workspace backend run start:dev",
+    "backend:build": "npm --workspace backend run build",
+    "backend:test": "npm --workspace backend test",
+    "backend:prisma:generate": "npm --workspace backend run prisma:generate",
+    "frontend:start": "npm --workspace frontend run start",
+    "frontend:android": "npm --workspace frontend run android",
+    "frontend:ios": "npm --workspace frontend run ios",
+    "frontend:web": "npm --workspace frontend run web",
+    "frontend:check": "npm --workspace frontend run check",
+    "build": "npm run backend:build && npm run frontend:check",
+    "test": "npm run backend:test",
+    "postinstall": "npm run backend:prisma:generate"
+  }
+}
