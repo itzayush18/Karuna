@@ -14,6 +14,7 @@
     "test:e2e": "jest --watchman=false --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts"
   },
@@ -33,6 +34,7 @@
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "dotenv": "^17.4.2",
     "helmet": "^8.1.0",
     "joi": "^18.1.2",
     "multer": "^2.1.1",
