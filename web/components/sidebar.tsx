@@ -79,9 +79,9 @@ export function Sidebar({ activeItem, onNavigate, aiSummary, highUrgencyCount = 
   ];
 
   return (
-    <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-[var(--line)] bg-white px-4 py-8 lg:flex">
+    <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-(--line)] bg-white px-4 py-8 lg:flex">
       <div className="mb-8 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200">
           <span className="text-xl font-bold">K</span>
         </div>
         <span className="section-title text-xl font-bold tracking-tight text-slate-900">Karuna Admin</span>

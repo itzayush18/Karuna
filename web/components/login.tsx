@@ -22,9 +22,9 @@ export function Login({ onLogin, onGoogleLogin, message, loading }: LoginProps) 
 
   return (
     <div className="karuna-shell flex min-h-screen items-center justify-center p-6">
-      <div className="glass-panel animate-fade-in w-full max-w-md overflow-hidden rounded-[32px] p-8 md:p-10">
+      <div className="glass-panel animate-fade-in w-full max-w-md overflow-hidden rounded-4xl p-8 md:p-10">
         <div className="mb-10 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-200">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-200">
             <span className="text-3xl font-bold">K</span>
           </div>
           <h1 className="section-title text-3xl font-extrabold tracking-tight text-slate-900">Karuna Admin</h1>
