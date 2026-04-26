@@ -1,15 +1,42 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { Colors, GoogleColors } from '@/constants/theme';
 import { Card } from '@/components/Card';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GoogleButton } from '@/components/GoogleButton';
 import { CurvedHeader } from '@/components/CurvedHeader';
+import { apiClient } from '@/api/client';
 
 export default function ImpactScreen() {
   const { dark } = useTheme();
   const themeColors = Colors[dark ? 'dark' : 'light'];
+
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchSummary = async () => {
+    try {
+      // Backend actually returns total tasks, total affected, etc.
+      const response = await apiClient.get('/dashboard/urgent-summary');
+      setSummary(response.data.data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard summary', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSummary();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchSummary();
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -24,88 +51,96 @@ export default function ImpactScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GoogleColors.blue} />
+          }
         >
         
-        {/* Global Impact Story */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Community Story</Text>
-        <Card style={styles.storyCard}>
-          <View style={styles.storyHeader}>
-            <View style={[styles.smallIconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
-              <MaterialIcons name="auto-awesome" size={16} color={GoogleColors.blue} />
-            </View>
-            <Text style={[styles.storyDate, { color: themeColors.textSecondary }]}>This Week</Text>
-          </View>
-          <Text style={[styles.storyMain, { color: themeColors.text }]}>
-            "10 volunteers helped reduce malnutrition risk for 45 children in Village A."
-          </Text>
-          <Text style={[styles.storySub, { color: themeColors.textSecondary }]}>
-            Without this intervention, historical data suggests a 40% chance of health decline in the affected demographic. Great job team!
-          </Text>
-          <View style={styles.storyFooter}>
-            <View style={styles.faceGroup}>
-              <View style={[styles.faceMock, { backgroundColor: GoogleColors.green }]} />
-              <View style={[styles.faceMock, { backgroundColor: GoogleColors.yellow, marginLeft: -10 }]} />
-              <View style={[styles.faceMock, { backgroundColor: GoogleColors.red, marginLeft: -10 }]} />
-              <Text style={[styles.faceCount, { color: themeColors.textSecondary }]}>+7 more</Text>
-            </View>
-            <MaterialIcons name="share" size={20} color={GoogleColors.blue} />
-          </View>
-        </Card>
+        {loading ? (
+          <ActivityIndicator size="large" color={GoogleColors.blue} style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            {/* Global Impact Story */}
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Community Story</Text>
+            <Card style={styles.storyCard}>
+              <View style={styles.storyHeader}>
+                <View style={[styles.smallIconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
+                  <MaterialIcons name="auto-awesome" size={16} color={GoogleColors.blue} />
+                </View>
+                <Text style={[styles.storyDate, { color: themeColors.textSecondary }]}>Live Summary</Text>
+              </View>
+              <Text style={[styles.storyMain, { color: themeColors.text }]}>
+                {summary ? `Identified ${summary.totalTasks || 0} urgent community tasks affecting ${summary.totalAffectedPeople || 0} individuals.` : 'Waiting for community data...'}
+              </Text>
+              <Text style={[styles.storySub, { color: themeColors.textSecondary }]}>
+                Together we're ensuring that the most critical needs are met. Real-time data keeps volunteers where they're needed most.
+              </Text>
+              <View style={styles.storyFooter}>
+                <View style={styles.faceGroup}>
+                  <View style={[styles.faceMock, { backgroundColor: GoogleColors.green }]} />
+                  <View style={[styles.faceMock, { backgroundColor: GoogleColors.yellow, marginLeft: -10 }]} />
+                  <View style={[styles.faceMock, { backgroundColor: GoogleColors.red, marginLeft: -10 }]} />
+                  <Text style={[styles.faceCount, { color: themeColors.textSecondary }]}>+ active volunteers</Text>
+                </View>
+                <MaterialIcons name="share" size={20} color={GoogleColors.blue} />
+              </View>
+            </Card>
 
-        {/* Automated Reports */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 16 }]}>Official Reports</Text>
-        <Card style={styles.reportCard}>
-          <View style={styles.reportRow}>
-            <View style={[styles.iconBox, { backgroundColor: GoogleColors.red + '20' }]}>
-              <MaterialIcons name="picture-as-pdf" size={24} color={GoogleColors.red} />
-            </View>
-            <View style={styles.reportInfo}>
-              <Text style={[styles.reportTitle, { color: themeColors.text }]}>April Monthly Overview</Text>
-              <Text style={[styles.reportDate, { color: themeColors.textSecondary }]}>Generated 2 days ago</Text>
-            </View>
-            <GoogleButton title="View" variant="outline" style={styles.viewBtn} textStyle={{ fontSize: 12 }} />
-          </View>
-        </Card>
+            {/* Automated Reports */}
+            <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 16 }]}>Official Reports</Text>
+            <Card style={styles.reportCard}>
+              <View style={styles.reportRow}>
+                <View style={[styles.iconBox, { backgroundColor: GoogleColors.red + '20' }]}>
+                  <MaterialIcons name="picture-as-pdf" size={24} color={GoogleColors.red} />
+                </View>
+                <View style={styles.reportInfo}>
+                  <Text style={[styles.reportTitle, { color: themeColors.text }]}>Weekly Overview</Text>
+                  <Text style={[styles.reportDate, { color: themeColors.textSecondary }]}>Generated dynamically</Text>
+                </View>
+                <GoogleButton title="View" variant="outline" style={styles.viewBtn} textStyle={{ fontSize: 12 }} />
+              </View>
+            </Card>
 
-        {/* Personal Impact History */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 24 }]}>Your Lifetime Impact</Text>
-        
-        <View style={styles.statsRow}>
-          <Card style={styles.statBox}>
-            <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.blue + '20' }]}>
-              <MaterialIcons name="family-restroom" size={24} color={GoogleColors.blue} />
-            </View>
-            <Text style={[styles.statNumber, { color: GoogleColors.blue }]}>142</Text>
-            <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Families Helped</Text>
-          </Card>
+            {/* Real-time Dashboard Stats */}
+            <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 24 }]}>Network Pulse</Text>
+            
+            <View style={styles.statsRow}>
+              <Card style={styles.statBox}>
+                <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.blue + '20' }]}>
+                  <MaterialIcons name="family-restroom" size={24} color={GoogleColors.blue} />
+                </View>
+                <Text style={[styles.statNumber, { color: GoogleColors.blue }]}>{summary?.totalAffectedPeople || '0'}</Text>
+                <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>People Affected</Text>
+              </Card>
 
-          <Card style={styles.statBox}>
-            <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.green + '20' }]}>
-              <MaterialIcons name="task-alt" size={24} color={GoogleColors.green} />
+              <Card style={styles.statBox}>
+                <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.green + '20' }]}>
+                  <MaterialIcons name="task-alt" size={24} color={GoogleColors.green} />
+                </View>
+                <Text style={[styles.statNumber, { color: GoogleColors.green }]}>{summary?.totalTasks || '0'}</Text>
+                <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Active Needs</Text>
+              </Card>
             </View>
-            <Text style={[styles.statNumber, { color: GoogleColors.green }]}>56</Text>
-            <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Tasks Completed</Text>
-          </Card>
-        </View>
 
-        <View style={styles.statsRow}>
-          <Card style={styles.statBox}>
-            <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.yellow + '20' }]}>
-              <MaterialIcons name="place" size={24} color={GoogleColors.yellow} />
+            <View style={styles.statsRow}>
+              <Card style={styles.statBox}>
+                <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.yellow + '20' }]}>
+                  <MaterialIcons name="place" size={24} color={GoogleColors.yellow} />
+                </View>
+                <Text style={[styles.statNumber, { color: GoogleColors.yellow }]}>{summary?.highSeverityTasks || '0'}</Text>
+                <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>High Urgency</Text>
+              </Card>
+
+              <Card style={styles.statBox}>
+                <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.red + '20' }]}>
+                  <MaterialIcons name="timer" size={24} color={GoogleColors.red} />
+                </View>
+                <Text style={[styles.statNumber, { color: GoogleColors.red }]}>Live</Text>
+                <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Updates</Text>
+              </Card>
             </View>
-            <Text style={[styles.statNumber, { color: GoogleColors.yellow }]}>12</Text>
-            <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Areas Reached</Text>
-          </Card>
-
-          <Card style={styles.statBox}>
-            <View style={[styles.statIconWrapper, { backgroundColor: GoogleColors.red + '20' }]}>
-              <MaterialIcons name="timer" size={24} color={GoogleColors.red} />
-            </View>
-            <Text style={[styles.statNumber, { color: GoogleColors.red }]}>180h</Text>
-            <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Time Donated</Text>
-          </Card>
-        </View>
-
+          </>
+        )}
         </ScrollView>
       </View>
     </View>

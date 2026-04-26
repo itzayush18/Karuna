@@ -1,20 +1,56 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Modal, TextInput, Alert, TouchableOpacity } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { Colors, GoogleColors } from '@/constants/theme';
 import { Card } from '@/components/Card';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CurvedHeader } from '@/components/CurvedHeader';
+import { useAuth } from '@/context/AuthContext';
+import { GoogleButton } from '@/components/GoogleButton';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { dark } = useTheme();
   const themeColors = Colors[dark ? 'dark' : 'light'];
+  const { user, logout } = useAuth();
+
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
+  const [localName, setLocalName] = useState(user?.name || user?.fullName || user?.email?.split('@')[0] || "Volunteer");
+  const [editName, setEditName] = useState(localName);
+
+  useEffect(() => {
+    // Load locally overridden name if exists
+    AsyncStorage.getItem('local_profile_name').then(name => {
+      if (name) {
+        setLocalName(name);
+        setEditName(name);
+      }
+    });
+  }, []);
+
+  const handleSaveProfile = async () => {
+    try {
+      await AsyncStorage.setItem('local_profile_name', editName);
+      setLocalName(editName);
+      setEditModalVisible(false);
+      Alert.alert('Success', 'Profile updated locally.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save profile');
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: () => logout() }
+    ]);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <CurvedHeader 
-        title="Priya Sharma" 
-        subtitle="Level 5 Volunteer" 
+        title={localName} 
+        subtitle={`Role: ${user?.role || 'Volunteer'}`} 
         color={GoogleColors.green} 
         icon="account-circle"
       />
@@ -25,6 +61,25 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
         
+        {/* Actions Row */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: GoogleColors.blue + '15' }]} 
+            onPress={() => setEditModalVisible(true)}
+          >
+            <MaterialIcons name="edit" size={20} color={GoogleColors.blue} />
+            <Text style={[styles.actionBtnText, { color: GoogleColors.blue }]}>Edit Profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: GoogleColors.red + '15' }]} 
+            onPress={handleLogout}
+          >
+            <MaterialIcons name="logout" size={20} color={GoogleColors.red} />
+            <Text style={[styles.actionBtnText, { color: GoogleColors.red }]}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Points Summary */}
         <View style={styles.pointsContainer}>
           <View style={styles.pointsBox}>
@@ -43,7 +98,7 @@ export default function ProfileScreen() {
             <Text style={[styles.coachTitle, { color: themeColors.text }]}>Daily Tip</Text>
           </View>
           <Text style={[styles.coachMessage, { color: themeColors.textSecondary }]}>
-            "Great job Priya! You helped 12 families last week. There's a small task near your route home today, want to check it out?"
+            "Great job {localName.split(' ')[0]}! You helped 12 families last week. There's a small task near your route home today, want to check it out?"
           </Text>
         </Card>
 
@@ -92,9 +147,41 @@ export default function ProfileScreen() {
           </Card>
 
         </View>
-
         </ScrollView>
       </View>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={isEditModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Edit Profile</Text>
+            
+            <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>Full Name</Text>
+            <TextInput
+              style={[styles.input, { color: themeColors.text, borderColor: themeColors.border }]}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Enter your name"
+              placeholderTextColor={themeColors.textSecondary}
+            />
+
+            <View style={styles.modalActions}>
+              <GoogleButton 
+                title="Cancel" 
+                variant="outline" 
+                style={styles.modalBtn} 
+                onPress={() => setEditModalVisible(false)} 
+              />
+              <GoogleButton 
+                title="Save" 
+                style={[styles.modalBtn, { backgroundColor: GoogleColors.blue }]} 
+                onPress={handleSaveProfile} 
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -221,5 +308,70 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 12,
     textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    marginTop: 8,
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 8,
+  },
+  actionBtnText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  modalTitle: {
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 24,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
   },
 });

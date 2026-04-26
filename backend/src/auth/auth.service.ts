@@ -64,4 +64,17 @@ export class AuthService {
       },
     };
   }
+
+  async getOrganizations() {
+    return this.prisma.organization.findMany({
+      select: {
+        id: true,
+        name: true,
+        type: true,
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+  }
 }

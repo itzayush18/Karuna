@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
@@ -10,6 +10,7 @@ import {
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
+import { AuthProvider } from '../context/AuthContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -35,12 +36,16 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="intro" options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="login" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="signup" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="intro" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="(tabs)" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

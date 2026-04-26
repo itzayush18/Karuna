@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '@/context/AuthContext';
 import { Colors, GoogleColors } from '@/constants/theme';
 import { useTheme } from '@react-navigation/native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -105,6 +106,22 @@ const CustomTabBar = (props: BottomTabBarProps) => {
 }
 
 export default function TabLayout() {
+  const { user, loading } = useAuth();
+  const { dark } = useTheme();
+  const themeColors = Colors[dark ? 'dark' : 'light'];
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+        {/* Can use ActivityIndicator here */}
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />
@@ -112,7 +129,6 @@ export default function TabLayout() {
       <Tabs.Screen name="report" />
       <Tabs.Screen name="impact" />
       <Tabs.Screen name="profile" />
-      <Tabs.Screen name="explore" options={{ tabBarButton: () => null }} />
     </Tabs>
   );
 }

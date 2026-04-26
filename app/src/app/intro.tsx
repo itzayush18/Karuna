@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { GoogleButton } from '@/components/GoogleButton';
 import { Colors, GoogleColors } from '@/constants/theme';
@@ -58,7 +59,7 @@ export default function IntroScreen() {
           <View style={styles.actionContainer}>
             <GoogleButton 
               title="GET STARTED" 
-              onPress={() => router.replace('/(tabs)')}
+              onPress={() => router.replace('/login')}
               style={styles.button}
               textStyle={styles.buttonText}
             />

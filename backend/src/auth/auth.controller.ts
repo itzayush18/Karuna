@@ -26,4 +26,9 @@ export class AuthController {
   me(@CurrentUser() user: RequestUser) {
     return user;
   }
+
+  @Get('organizations')
+  getOrganizations() {
+    return this.auth.getOrganizations();
+  }
 }
