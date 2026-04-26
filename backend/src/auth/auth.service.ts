@@ -140,10 +140,14 @@ export class AuthService {
     const firebaseUser = await this.firebase.verifyIdToken(dto.idToken);
     if (!firebaseUser.email) throw new UnauthorizedException('Firebase account does not include an email');
 
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { email: firebaseUser.email.toLowerCase() },
       include: { role: true },
     });
+
+    if (!user && this.config.get<boolean>('firebase.autoProvision', false)) {
+      user = await this.createFirebaseProvisionedUser(firebaseUser);
+    }
 
     if (!user || !user.active) {
       throw new UnauthorizedException('No active Karuna account is linked to this Firebase email');
@@ -154,6 +158,25 @@ export class AuthService {
     });
 
     return this.issueToken(user);
+  }
+
+  private async createFirebaseProvisionedUser(firebaseUser: { email?: string; name?: string; uid?: string; sub?: string }) {
+    const email = firebaseUser.email?.toLowerCase();
+    if (!email) throw new UnauthorizedException('Firebase account does not include an email');
+
+    const configuredRole = this.config.get<string>('firebase.autoProvisionRole', 'ADMIN') as RoleName;
+    const role = await this.prisma.role.findUnique({ where: { name: configuredRole } });
+    if (!role) throw new ConflictException('Seed roles before using Firebase login');
+
+    return this.prisma.user.create({
+      data: {
+        email,
+        fullName: firebaseUser.name || email.split('@')[0],
+        passwordHash: await bcrypt.hash(`firebase:${firebaseUser.uid ?? firebaseUser.sub ?? email}`, 12),
+        roleId: role.id,
+      },
+      include: { role: true },
+    });
   }
 
   async registerWithFirebase(dto: FirebaseRegisterDto) {

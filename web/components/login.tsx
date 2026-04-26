@@ -5,10 +5,11 @@ import React, { useState } from "react";
 interface LoginProps {
   onLogin: (baseUrl: string, credentials: { email: string; password?: string }) => void;
   onGoogleLogin: (baseUrl: string) => void;
+  message?: string;
   loading?: boolean;
 }
 
-export function Login({ onLogin, onGoogleLogin, loading }: LoginProps) {
+export function Login({ onLogin, onGoogleLogin, message, loading }: LoginProps) {
   const [baseUrl, setBaseUrl] = useState("http://localhost:3000");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,6 +86,12 @@ export function Login({ onLogin, onGoogleLogin, loading }: LoginProps) {
           >
             {loading ? "Authenticating..." : "Connect to Dashboard"}
           </button>
+
+          {message && (
+            <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {message}
+            </p>
+          )}
 
           <button
             type="button"

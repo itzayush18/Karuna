@@ -140,6 +140,16 @@ export interface MatchSuggestion {
   explanation: Record<string, unknown>;
 }
 
+export interface AIInsight {
+  id: string;
+  text: string;
+  category: string;
+  location: string;
+  confidence: number;
+  severity: "LOW" | "MEDIUM" | "HIGH" | string;
+  timestamp: string;
+}
+
 export interface AdminDataState {
   urgentSummary: UrgentSummary | null;
   mapTasks: TaskView[];
@@ -161,6 +171,7 @@ export interface AdminDataState {
   auditLogs: Dict[];
   aiLogs: Dict[];
   governanceInsights: string;
+  aiInsightFeed: AIInsight[];
 }
 
 export interface RequestContext {

@@ -1,25 +1,13 @@
 import { DashboardFilters } from "./models";
 
 type Props = {
-  baseUrl: string;
-  token: string;
   filters: DashboardFilters;
-  loading: boolean;
-  onBaseUrlChange: (value: string) => void;
-  onTokenChange: (value: string) => void;
   onFilterChange: (key: keyof DashboardFilters, value: string) => void;
-  onRefresh: () => void;
 };
 
 export function FiltersBar({
-  baseUrl,
-  token,
   filters,
-  loading,
-  onBaseUrlChange,
-  onTokenChange,
   onFilterChange,
-  onRefresh,
 }: Props) {
   return (
     <section className="card-premium p-6">
@@ -105,4 +93,3 @@ export function FiltersBar({
     </section>
   );
 }
-

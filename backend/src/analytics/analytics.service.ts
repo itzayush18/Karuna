@@ -58,6 +58,78 @@ export class AnalyticsService {
     });
   }
 
+  async aiInsightFeed() {
+    const [reports, tasks, predictions, volunteers, auditLogs] = await Promise.all([
+      this.prisma.communityReport.findMany({
+        take: 40,
+        orderBy: { createdAt: 'desc' },
+        include: { location: true, extracted: true },
+      }),
+      this.prisma.task.findMany({
+        take: 60,
+        orderBy: { createdAt: 'desc' },
+        include: { location: true, urgencyScores: { orderBy: { calculatedAt: 'desc' }, take: 1 } },
+      }),
+      this.prisma.prediction.findMany({
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+        include: { location: true },
+      }),
+      this.prisma.volunteer.findMany({
+        take: 60,
+        include: { user: true, assignments: true },
+      }),
+      this.prisma.auditLog.findMany({
+        take: 30,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return this.ai.generateDashboardInsights({
+      reports: reports.map((report) => ({
+        id: report.id,
+        source: report.source,
+        status: report.processingStatus,
+        category: report.extracted?.category,
+        affectedPeople: report.extracted?.affectedPeople,
+        summary: report.extracted?.summary ?? report.rawText,
+        location: report.location,
+        createdAt: report.createdAt,
+      })),
+      tasks: tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        category: task.category,
+        status: task.status,
+        affectedPeople: task.affectedPeople,
+        location: task.location,
+        urgencyScores: task.urgencyScores,
+        createdAt: task.createdAt,
+      })),
+      predictions: predictions.map((prediction) => ({
+        title: prediction.title,
+        type: prediction.type,
+        confidence: prediction.confidence,
+        signalWindow: prediction.signalWindow,
+        location: prediction.location,
+        createdAt: prediction.createdAt,
+      })),
+      volunteers: volunteers.map((volunteer) => ({
+        id: volunteer.id,
+        name: volunteer.user.fullName,
+        active: volunteer.user.active,
+        workloadScore: volunteer.workloadScore,
+        fatigueScore: volunteer.fatigueScore,
+        assignments: volunteer.assignments.length,
+      })),
+      auditLogs: auditLogs.map((log) => ({
+        action: log.action,
+        entityType: log.entityType,
+        createdAt: log.createdAt,
+      })),
+    });
+  }
+
   private countBy<T extends Record<string, unknown>>(items: T[], key: keyof T) {
     return items.reduce<Record<string, number>>((acc, item) => {
       const value = String(item[key]);

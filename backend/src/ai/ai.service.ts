@@ -240,6 +240,67 @@ export class AiService {
     }
   }
 
+  async generateDashboardInsights(data: {
+    reports: any[];
+    tasks: any[];
+    predictions: any[];
+    volunteers: any[];
+    auditLogs: any[];
+  }) {
+    if (!this.client) {
+      return this.dashboardInsightFallback(data);
+    }
+
+    const prompt = `
+      You are Karuna's AI operations analyst for an NGO coordination dashboard.
+      Create concise, decision-ready insight cards for non-technical coordinators.
+
+      Return ONLY valid JSON with this exact shape:
+      {
+        "insights": [
+          {
+            "text": "one actionable observation under 28 words",
+            "category": "FOOD | WATER | MEDICAL | SHELTER | SANITATION | EDUCATION | TRANSPORT | GOVERNANCE | OTHER",
+            "location": "specific village/district or All locations",
+            "confidence": 0.0,
+            "severity": "LOW | MEDIUM | HIGH",
+            "timestamp": "ISO-8601 timestamp"
+          }
+        ]
+      }
+
+      Rules:
+      - Provide exactly 4 insight cards.
+      - Keep every text field under 22 words.
+      - Prefer patterns, changes, risk concentrations, fairness concerns, and operational bottlenecks.
+      - Do not invent exact percentage changes unless directly implied by the data.
+      - Use neutral language and practical recommendations.
+
+      DATA:
+      ${JSON.stringify(data).slice(0, 16000)}
+    `;
+
+    try {
+      const response = await this.callGeminiWithRetry({
+        model: this.model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: 'application/json',
+          responseJsonSchema: this.dashboardInsightSchema() as never,
+          temperature: 0.35,
+          maxOutputTokens: 2400,
+        },
+      } as never);
+
+      const parsed = this.parseJsonResponse(response.text ?? '{"insights":[]}') as { insights?: unknown[] };
+      const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
+      return insights.slice(0, 6).map((item, index) => this.normalizeDashboardInsight(item, index));
+    } catch (error) {
+      this.logger.warn(`Dashboard insight generation fell back: ${this.sanitizeError(error)}`);
+      return this.dashboardInsightFallback(data);
+    }
+  }
+
   private async extractWithGemini(report: {
     source: ReportSource;
     rawText: string | null;
@@ -269,6 +330,125 @@ export class AiService {
     } as never);
 
     return this.normalizeExtraction(JSON.parse(response.text ?? '{}'));
+  }
+
+  private normalizeDashboardInsight(item: unknown, index: number) {
+    const value = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    const confidence = Number(value.confidence ?? 0.6);
+    const severity = String(value.severity ?? 'MEDIUM').toUpperCase();
+    return {
+      id: `ai-insight-${Date.now()}-${index}`,
+      text: String(value.text ?? 'Review recent operations data for emerging service gaps.').slice(0, 220),
+      category: String(value.category ?? 'OTHER').toUpperCase(),
+      location: String(value.location ?? 'All locations').slice(0, 120),
+      confidence: Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0.6)),
+      severity: ['LOW', 'MEDIUM', 'HIGH'].includes(severity) ? severity : 'MEDIUM',
+      timestamp: String(value.timestamp ?? new Date().toISOString()),
+    };
+  }
+
+  private dashboardInsightSchema() {
+    return {
+      type: 'object',
+      properties: {
+        insights: {
+          type: 'array',
+          minItems: 4,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            properties: {
+              text: { type: 'string' },
+              category: {
+                type: 'string',
+                enum: ['FOOD', 'WATER', 'MEDICAL', 'SHELTER', 'SANITATION', 'EDUCATION', 'TRANSPORT', 'GOVERNANCE', 'OTHER'],
+              },
+              location: { type: 'string' },
+              confidence: { type: 'number' },
+              severity: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] },
+              timestamp: { type: 'string' },
+            },
+            required: ['text', 'category', 'location', 'confidence', 'severity', 'timestamp'],
+          },
+        },
+      },
+      required: ['insights'],
+    };
+  }
+
+  private parseJsonResponse(text: string) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error(`Gemini returned an incomplete or non-JSON insight response (${text.length} chars)`);
+      return JSON.parse(match[0]);
+    }
+  }
+
+  private dashboardInsightFallback(data: {
+    reports: any[];
+    tasks: any[];
+    predictions: any[];
+    volunteers: any[];
+    auditLogs: any[];
+  }) {
+    const openTasks = data.tasks.filter((task) => ['OPEN', 'ASSIGNED', 'IN_PROGRESS'].includes(String(task.status)));
+    const highUrgency = openTasks.filter((task) => (task.urgencyScores?.[0]?.score ?? 0) >= 70);
+    const topCategory = this.topCount(data.tasks.map((task) => String(task.category ?? 'OTHER')));
+    const topLocation = this.topCount(
+      data.tasks.map((task) => String(task.location?.village ?? task.location?.district ?? 'All locations')),
+    );
+
+    return [
+      {
+        id: 'fallback-high-urgency',
+        text: `${highUrgency.length} high urgency cases need coordinator review across active tasks.`,
+        category: 'GOVERNANCE',
+        location: 'All locations',
+        confidence: 0.62,
+        severity: highUrgency.length ? 'HIGH' : 'LOW',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 'fallback-category',
+        text: `${topCategory.label} is currently the most common task category in the operations queue.`,
+        category: topCategory.label,
+        location: 'All locations',
+        confidence: 0.58,
+        severity: 'MEDIUM',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 'fallback-location',
+        text: `${topLocation.label} shows the highest concentration of tracked tasks.`,
+        category: 'OTHER',
+        location: topLocation.label,
+        confidence: 0.56,
+        severity: 'MEDIUM',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 'fallback-fairness',
+        text: `${data.volunteers.length} volunteers are available for workload balancing and assignment fairness checks.`,
+        category: 'GOVERNANCE',
+        location: 'All locations',
+        confidence: 0.54,
+        severity: 'LOW',
+        timestamp: new Date().toISOString(),
+      },
+    ];
+  }
+
+  private topCount(values: string[]) {
+    const counts = values.reduce<Record<string, number>>((acc, value) => {
+      const key = value || 'Unknown';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const [label = 'Unknown', count = 0] =
+      Object.entries(counts).sort((a, b) => b[1] - a[1])[0] ?? [];
+    return { label, count };
   }
 
   private extractionPrompt() {

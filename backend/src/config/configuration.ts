@@ -10,6 +10,9 @@ export const configuration = () => ({
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    webApiKey: process.env.FIREBASE_WEB_API_KEY,
+    autoProvision: process.env.FIREBASE_AUTO_PROVISION === 'true',
+    autoProvisionRole: process.env.FIREBASE_AUTO_PROVISION_ROLE ?? 'ADMIN',
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,

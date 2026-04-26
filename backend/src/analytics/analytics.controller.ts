@@ -25,4 +25,9 @@ export class AnalyticsController {
   governanceInsights() {
     return this.analytics.governanceInsights();
   }
+
+  @Get('ai-insight-feed')
+  aiInsightFeed() {
+    return this.analytics.aiInsightFeed();
+  }
 }

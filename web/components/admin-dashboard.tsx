@@ -1,33 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 import {
   generatePredictions,
   loadAdminData,
-  markNotificationRead,
   processReport,
   scoreTask,
   suggestMatches,
   authLogin,
   authGoogleLogin,
   getGovernanceInsights,
+  getAiInsightFeed,
 } from "./admin-api";
-import { AdminHeader } from "./admin-header";
-import { FiltersBar } from "./filters-bar";
 import {
   DataCollectionPanel,
   EngagementPanel,
-  ImpactPanel,
   MatchingPanel,
-  PredictionsPanel,
   UrgencyPanel,
 } from "./feature-panels";
-import { KpiOverview } from "./kpi-overview";
 import { AdminDataState, DashboardFilters, MatchSuggestion, RequestContext } from "./models";
-import { OperationsPanel } from "./operations-panel";
 import { NavItem, Sidebar } from "./sidebar";
 import { StatsGrid } from "./stats-grid";
 import { ModernTable } from "./modern-table";
+import {
+  AuditDashboard,
+  ExplanationPanel,
+  GovernanceDashboard,
+  ImpactDashboard,
+  InsightDashboard,
+  PredictionsDashboard,
+} from "./ai-governance-panels";
 
 import { Login } from "./login";
 
@@ -57,7 +60,24 @@ const initialState: AdminDataState = {
   auditLogs: [],
   aiLogs: [],
   governanceInsights: "",
+  aiInsightFeed: [],
 };
+
+async function refreshDashboardData(
+  context: RequestContext,
+  currentToken: string,
+  setData: React.Dispatch<React.SetStateAction<AdminDataState>>,
+  setErrors: React.Dispatch<React.SetStateAction<Partial<Record<keyof AdminDataState, string>>>>,
+) {
+  const result = await loadAdminData({ ...context, token: currentToken });
+  const [insights, aiInsightFeed] = await Promise.all([
+    getGovernanceInsights({ ...context, token: currentToken }),
+    getAiInsightFeed({ ...context, token: currentToken }).catch(() => []),
+  ]);
+  setData((prev) => ({ ...prev, ...result.data, governanceInsights: insights, aiInsightFeed }));
+  setErrors(result.errors);
+  return result.errors;
+}
 
 export function AdminDashboard() {
   const [baseUrl, setBaseUrl] = useState(() => {
@@ -68,7 +88,7 @@ export function AdminDashboard() {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("karuna.token") ?? "";
   });
-  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+  const [filters] = useState<DashboardFilters>(defaultFilters);
   const [data, setData] = useState(initialState);
   const [errors, setErrors] = useState<Partial<Record<keyof typeof initialState, string>>>({});
   const [loading, setLoading] = useState(false);
@@ -78,14 +98,15 @@ export function AdminDashboard() {
   const [selectedReportId, setSelectedReportId] = useState("");
   const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [activeItem, setActiveItem] = useState<NavItem>("overview");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    if (token) {
-      setIsAuthenticated(true);
-      refreshAll();
-    }
-  }, []);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(token));
+  const selectedTask = useMemo(
+    () => data.tasks.find((task) => task.id === selectedTaskId) ?? data.urgentTasks.find((task) => task.id === selectedTaskId),
+    [data.tasks, data.urgentTasks, selectedTaskId],
+  );
+  const selectedReport = useMemo(
+    () => data.reports.find((report) => report.id === selectedReportId) ?? data.pendingReports.find((report) => report.id === selectedReportId),
+    [data.pendingReports, data.reports, selectedReportId],
+  );
 
   useEffect(() => {
     window.localStorage.setItem("karuna.baseUrl", baseUrl);
@@ -108,8 +129,7 @@ export function AdminDashboard() {
       const { accessToken } = await authLogin(url, credentials);
       setToken(accessToken);
       setIsAuthenticated(true);
-      // Trigger refresh after setting state
-      setTimeout(() => refreshAll(), 100);
+      await refreshAll(accessToken);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed.");
     } finally {
@@ -125,7 +145,7 @@ export function AdminDashboard() {
       const { accessToken } = await authGoogleLogin(url);
       setToken(accessToken);
       setIsAuthenticated(true);
-      setTimeout(() => refreshAll(), 100);
+      await refreshAll(accessToken);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Google authentication failed.");
     } finally {
@@ -139,8 +159,8 @@ export function AdminDashboard() {
     window.localStorage.removeItem("karuna.token");
   };
 
-  const refreshAll = useCallback(async () => {
-    const currentToken = window.localStorage.getItem("karuna.token") || token;
+  async function refreshAll(overrideToken?: string) {
+    const currentToken = overrideToken || window.localStorage.getItem("karuna.token") || token;
     if (!currentToken.trim()) {
       setMessage("Enter a valid JWT token to fetch backend modules.");
       return;
@@ -149,12 +169,9 @@ export function AdminDashboard() {
     setLoading(true);
     setMessage("");
     try {
-      const result = await loadAdminData({ ...context, token: currentToken });
-      const insights = await getGovernanceInsights({ ...context, token: currentToken });
-      setData((prev) => ({ ...prev, ...result.data, governanceInsights: insights }));
-      setErrors(result.errors);
+      const nextErrors = await refreshDashboardData(context, currentToken, setData, setErrors);
       setLastRefresh(new Date().toLocaleTimeString());
-      const failures = Object.keys(result.errors).length;
+      const failures = Object.keys(nextErrors).length;
       setMessage(
         failures
           ? `Loaded with ${failures} module errors. Review warning panel below.`
@@ -165,27 +182,42 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    async function loadInitialData() {
+      if (!token) return;
+      setLoading(true);
+      setMessage("");
+      try {
+        const nextErrors = await refreshDashboardData(context, token, setData, setErrors);
+        setLastRefresh(new Date().toLocaleTimeString());
+        const failures = Object.keys(nextErrors).length;
+        setMessage(
+          failures
+            ? `Loaded with ${failures} module errors. Review warning panel below.`
+            : "All backend modules loaded successfully.",
+        );
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Failed to refresh backend data.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadInitialData();
   }, [context, token]);
 
-  const runAction = useCallback(
-    async (label: string, handler: () => Promise<unknown>) => {
-      try {
-        setMessage(`${label} in progress...`);
-        await handler();
-        setMessage(`${label} completed.`);
-        await refreshAll();
-      } catch (error) {
-        setMessage(error instanceof Error ? `${label} failed: ${error.message}` : `${label} failed.`);
-      }
-    },
-    [refreshAll],
-  );
-
-  const updateFilter = (key: keyof DashboardFilters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-  };
-
-  const errorCount = Object.keys(errors).length;
+  async function runAction(label: string, handler: () => Promise<unknown>) {
+    try {
+      setMessage(`${label} in progress...`);
+      await handler();
+      setMessage(`${label} completed.`);
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? `${label} failed: ${error.message}` : `${label} failed.`);
+    }
+  }
 
   const renderContent = () => {
     switch (activeItem) {
@@ -207,12 +239,8 @@ export function AdminDashboard() {
                   })
                 }
               />
-              <PredictionsPanel
-                predictions={data.predictions}
-                onGenerate={() => runAction("Prediction generation", () => generatePredictions(context))}
-              />
+              <ExplanationPanel selectedTask={selectedTask} selectedReport={selectedReport} />
             </div>
-            <ImpactPanel impactSummary={data.impactSummary} ngoReport={data.ngoReport} />
           </div>
         );
       case "reports":
@@ -305,21 +333,43 @@ export function AdminDashboard() {
             />
           </div>
         );
-      case "users":
       case "ai":
-      case "audit":
         return (
-          <OperationsPanel
-            users={data.users}
-            roles={data.roles}
-            locations={data.locations}
-            auditLogs={data.auditLogs}
-            notifications={data.notifications}
-            tasks={data.tasks}
+          <InsightDashboard
+            insights={data.aiInsightFeed}
             governanceInsights={data.governanceInsights}
-            onMarkNotificationRead={(id) =>
-              runAction("Notification update", () => markNotificationRead(context, id))
-            }
+            reports={data.reports}
+            tasks={data.tasks}
+            villageStatus={data.villageStatus}
+            loading={loading}
+          />
+        );
+      case "predictions":
+        return (
+          <PredictionsDashboard
+            predictions={data.predictions}
+            onGenerate={() => runAction("Prediction generation", () => generatePredictions(context))}
+          />
+        );
+      case "governance":
+        return (
+          <GovernanceDashboard
+            volunteers={data.volunteers}
+            tasks={data.tasks}
+            notifications={data.notifications}
+            locations={data.locations}
+            governanceInsights={data.governanceInsights}
+          />
+        );
+      case "audit":
+        return <AuditDashboard auditLogs={data.auditLogs} />;
+      case "impact":
+        return (
+          <ImpactDashboard
+            impactSummary={data.impactSummary}
+            ngoReport={data.ngoReport}
+            volunteers={data.volunteers}
+            governanceInsights={data.governanceInsights}
           />
         );
       default:
@@ -327,23 +377,41 @@ export function AdminDashboard() {
     }
   };
 
+  const pageTitle =
+    {
+      overview: "Overview",
+      reports: "Reports",
+      tasks: "Tasks",
+      volunteers: "Volunteers",
+      ai: "AI Insights",
+      predictions: "Predictions",
+      governance: "Governance",
+      audit: "Audit Logs",
+      impact: "Impact Reports",
+    }[activeItem] ?? "Dashboard";
+
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} loading={loading} />;
+    return <Login onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} message={message} loading={loading} />;
   }
 
   return (
     <div className="karuna-shell min-h-screen">
-      <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
+      <Sidebar
+        activeItem={activeItem}
+        onNavigate={setActiveItem}
+        aiSummary={data.aiInsightFeed[0]?.text ?? data.governanceInsights}
+        highUrgencyCount={data.urgentTasks.filter((task) => (task.urgencyScores?.[0]?.score ?? 0) >= 70).length}
+      />
       
       <main className="lg:ml-64 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-7xl">
           <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="section-title text-3xl font-extrabold tracking-tight text-slate-900">
-                {activeItem.charAt(0).toUpperCase() + activeItem.slice(1)}
+                {pageTitle}
               </h1>
               <p className="mt-1 text-slate-500">
-                Karuna Mission Control Center
+                Karuna Mission Control Center · Last sync {lastRefresh}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -354,7 +422,7 @@ export function AdminDashboard() {
                 Logout
               </button>
               <button
-                onClick={refreshAll}
+                onClick={() => refreshAll()}
                 disabled={loading}
                 className="btn-premium-primary flex items-center gap-2 shadow-sm"
               >
@@ -369,6 +437,12 @@ export function AdminDashboard() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                 <span className="font-medium">{message}</span>
               </div>
+            </div>
+          )}
+
+          {Object.keys(errors).length > 0 && (
+            <div className="mb-8 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+              Some modules could not load: {Object.entries(errors).map(([key]) => key).join(", ")}
             </div>
           )}
 

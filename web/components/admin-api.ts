@@ -163,6 +163,10 @@ export async function getGovernanceInsights(ctx: RequestContext) {
   return apiGet<string>(ctx, "/analytics/governance-insights");
 }
 
+export async function getAiInsightFeed(ctx: RequestContext) {
+  return apiGet<AdminDataState["aiInsightFeed"]>(ctx, "/analytics/ai-insight-feed");
+}
+
 export async function markNotificationRead(ctx: RequestContext, id: string) {
   return apiPost<unknown>(ctx, `/notifications/${id}/read`);
 }

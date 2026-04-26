@@ -2,14 +2,16 @@
 
 import React from "react";
 
-export type NavItem = "overview" | "reports" | "tasks" | "volunteers" | "users" | "ai" | "audit";
+export type NavItem = "overview" | "reports" | "tasks" | "volunteers" | "ai" | "predictions" | "governance" | "audit" | "impact";
 
 interface SidebarProps {
   activeItem: NavItem;
   onNavigate: (item: NavItem) => void;
+  aiSummary?: string;
+  highUrgencyCount?: number;
 }
 
-export function Sidebar({ activeItem, onNavigate }: SidebarProps) {
+export function Sidebar({ activeItem, onNavigate, aiSummary, highUrgencyCount = 0 }: SidebarProps) {
   const items: { id: NavItem; label: string; icon: React.ReactNode }[] = [
     {
       id: "overview",
@@ -40,13 +42,6 @@ export function Sidebar({ activeItem, onNavigate }: SidebarProps) {
       ),
     },
     {
-      id: "users",
-      label: "Governance",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      ),
-    },
-    {
       id: "ai",
       label: "AI Insights",
       icon: (
@@ -54,10 +49,31 @@ export function Sidebar({ activeItem, onNavigate }: SidebarProps) {
       ),
     },
     {
+      id: "predictions",
+      label: "Predictions",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      ),
+    },
+    {
+      id: "governance",
+      label: "Governance",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      ),
+    },
+    {
       id: "audit",
       label: "Audit Logs",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+      ),
+    },
+    {
+      id: "impact",
+      label: "Impact",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
       ),
     },
   ];
@@ -83,6 +99,16 @@ export function Sidebar({ activeItem, onNavigate }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">AI Signal</p>
+          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-blue-700">{highUrgencyCount} high</span>
+        </div>
+        <p className="line-clamp-4 text-xs leading-5 text-slate-700">
+          {aiSummary || "Refresh the dashboard to generate coordinator insights."}
+        </p>
+      </div>
 
       <div className="mt-auto rounded-2xl bg-slate-50 p-4">
         <div className="flex items-center gap-3">
