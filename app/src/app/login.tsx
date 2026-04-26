@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, ActivityIndicator, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { GoogleButton } from '@/components/GoogleButton';
 import { Colors, GoogleColors } from '@/constants/theme';
 import { useTheme } from '@react-navigation/native';
 import { useAuth } from '@/context/AuthContext';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -14,8 +15,9 @@ export default function LoginScreen() {
   const bgColor = dark ? '#101010' : '#1A1C1E';
   const textColor = '#FFFFFF';
 
-  const [email, setEmail] = useState('volunteer@karuna.local');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -30,7 +32,7 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Login Failed', error?.response?.data?.message || 'Invalid credentials');
+      Alert.alert('Login Failed', error?.response?.data?.message || error?.message || 'Invalid credentials');
     } finally {
       setIsLoading(false);
     }
@@ -38,7 +40,7 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
-      
+
       {/* Background Shapes Layer */}
       <View style={StyleSheet.absoluteFillObject}>
         <View style={[styles.blob, styles.redBlob, { backgroundColor: GoogleColors.red }]} />
@@ -63,20 +65,25 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TextInput
-              style={[styles.input, { color: textColor }]}
-              placeholder="Password"
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, { color: textColor }]}
+                placeholder="Password"
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <Pressable style={styles.eyeButton} onPress={() => setShowPassword((value) => !value)}>
+                <MaterialIcons name={showPassword ? 'visibility-off' : 'visibility'} size={22} color="rgba(255,255,255,0.7)" />
+              </Pressable>
+            </View>
+
             {isLoading ? (
               <ActivityIndicator size="large" color={GoogleColors.blue} style={styles.loader} />
             ) : (
-              <GoogleButton 
-                title="SIGN IN" 
+              <GoogleButton
+                title="SIGN IN"
                 onPress={handleLogin}
                 style={styles.button}
                 textStyle={styles.buttonText}
@@ -157,6 +164,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  passwordField: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 56,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    padding: 8,
+  },
   loader: {
     marginTop: 20,
   },
@@ -172,7 +191,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   buttonText: {
-    color: '#000000', 
+    color: '#000000',
     fontFamily: 'Poppins_700Bold',
     fontSize: 16,
     letterSpacing: 1,

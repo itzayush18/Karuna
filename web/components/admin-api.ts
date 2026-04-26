@@ -5,6 +5,8 @@ import {
   MatchSuggestion,
   RequestContext,
 } from "./models";
+import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 function buildQuery(params: DashboardFilters) {
   const query = new URLSearchParams();
@@ -61,12 +63,36 @@ export async function apiPost<T>(ctx: RequestContext, path: string, body?: unkno
 }
 
 export async function authLogin(baseUrl: string, credentials: { email: string; password?: string }) {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/auth/login`, {
+  if (!credentials.password) throw new Error("Password is required");
+
+  const firebaseCredential = await signInWithEmailAndPassword(getFirebaseAuth(), credentials.email, credentials.password);
+  const idToken = await firebaseCredential.user.getIdToken();
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/auth/firebase/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(credentials),
+    body: JSON.stringify({ idToken }),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ accessToken: string }>(response);
+}
+
+export async function authGoogleLogin(baseUrl: string) {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+
+  const firebaseCredential = await signInWithPopup(getFirebaseAuth(), provider);
+  const idToken = await firebaseCredential.user.getIdToken();
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/auth/firebase/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ idToken }),
     cache: "no-store",
   });
 

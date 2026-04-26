@@ -6,8 +6,12 @@ export interface User {
   id: string;
   email: string;
   role: string;
-  name?: string;
   fullName?: string;
+  points?: number;
+  workloadScore?: number;
+  fatigueScore?: number;
+  performanceScore?: number;
+  maxWeeklyHours?: number;
 }
 
 interface AuthContextData {
@@ -47,12 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.post('/auth/login', { email, password });
       const { accessToken } = response.data.data;
-      
+
       if (accessToken) {
         await AsyncStorage.setItem('auth_token', accessToken);
         await loadUser();
       } else {
-         throw new Error('No token returned');
+        throw new Error('No token returned');
       }
     } catch (error) {
       throw error;
@@ -63,12 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.post('/auth/register', { email, fullName, password, organizationId });
       const { accessToken } = response.data.data;
-      
+
       if (accessToken) {
         await AsyncStorage.setItem('auth_token', accessToken);
         await loadUser();
       } else {
-         throw new Error('No token returned');
+        throw new Error('No token returned');
       }
     } catch (error) {
       throw error;

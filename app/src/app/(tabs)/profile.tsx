@@ -7,7 +7,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { CurvedHeader } from '@/components/CurvedHeader';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleButton } from '@/components/GoogleButton';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { dark } = useTheme();
@@ -15,22 +14,17 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
 
   const [isEditModalVisible, setEditModalVisible] = useState(false);
-  const [localName, setLocalName] = useState(user?.name || user?.fullName || user?.email?.split('@')[0] || "Volunteer");
+  const [localName, setLocalName] = useState(user?.fullName || user?.email?.split('@')[0] || 'Volunteer');
   const [editName, setEditName] = useState(localName);
 
   useEffect(() => {
-    // Load locally overridden name if exists
-    AsyncStorage.getItem('local_profile_name').then(name => {
-      if (name) {
-        setLocalName(name);
-        setEditName(name);
-      }
-    });
-  }, []);
+    const nextName = user?.fullName || user?.email?.split('@')[0] || 'Volunteer';
+    setLocalName(nextName);
+    setEditName(nextName);
+  }, [user?.email, user?.fullName]);
 
   const handleSaveProfile = async () => {
     try {
-      await AsyncStorage.setItem('local_profile_name', editName);
       setLocalName(editName);
       setEditModalVisible(false);
       Alert.alert('Success', 'Profile updated locally.');
@@ -48,105 +42,105 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-      <CurvedHeader 
-        title={localName} 
-        subtitle={`Role: ${user?.role || 'Volunteer'}`} 
-        color={GoogleColors.green} 
+      <CurvedHeader
+        title={localName}
+        subtitle={`Role: ${user?.role || 'Volunteer'}`}
+        color={GoogleColors.green}
         icon="account-circle"
       />
 
       <View style={{ flex: 1, position: 'relative', zIndex: 1, elevation: 1 }}>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent} 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-        
-        {/* Actions Row */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: GoogleColors.blue + '15' }]} 
-            onPress={() => setEditModalVisible(true)}
-          >
-            <MaterialIcons name="edit" size={20} color={GoogleColors.blue} />
-            <Text style={[styles.actionBtnText, { color: GoogleColors.blue }]}>Edit Profile</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: GoogleColors.red + '15' }]} 
-            onPress={handleLogout}
-          >
-            <MaterialIcons name="logout" size={20} color={GoogleColors.red} />
-            <Text style={[styles.actionBtnText, { color: GoogleColors.red }]}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Actions Row */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: GoogleColors.blue + '15' }]}
+              onPress={() => setEditModalVisible(true)}
+            >
+              <MaterialIcons name="edit" size={20} color={GoogleColors.blue} />
+              <Text style={[styles.actionBtnText, { color: GoogleColors.blue }]}>Edit Profile</Text>
+            </TouchableOpacity>
 
-        {/* Points Summary */}
-        <View style={styles.pointsContainer}>
-          <View style={styles.pointsBox}>
-            <Text style={[styles.pointsLabel, { color: themeColors.textSecondary }]}>Total Points</Text>
-            <Text style={[styles.pointsValue, { color: GoogleColors.green }]}>2,450</Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: GoogleColors.red + '15' }]}
+              onPress={handleLogout}
+            >
+              <MaterialIcons name="logout" size={20} color={GoogleColors.red} />
+              <Text style={[styles.actionBtnText, { color: GoogleColors.red }]}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* AI Coach */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Your AI Coach</Text>
-        <Card style={[styles.coachCard, { borderColor: GoogleColors.blue, borderWidth: 1 }]}>
-          <View style={styles.coachHeader}>
-            <View style={[styles.iconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
-              <MaterialIcons name="smart-toy" size={24} color={GoogleColors.blue} />
-            </View>
-            <Text style={[styles.coachTitle, { color: themeColors.text }]}>Daily Tip</Text>
-          </View>
-          <Text style={[styles.coachMessage, { color: themeColors.textSecondary }]}>
-            "Great job {localName.split(' ')[0]}! You helped 12 families last week. There's a small task near your route home today, want to check it out?"
-          </Text>
-        </Card>
-
-        {/* Monthly Challenge */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Monthly Challenge</Text>
-        <Card>
-          <View style={styles.challengeHeader}>
-            <View style={[styles.iconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
-              <MaterialIcons name="water-drop" size={24} color={GoogleColors.blue} />
-            </View>
-            <View style={styles.challengeTitleCol}>
-              <Text style={[styles.challengeTitle, { color: themeColors.text }]}>Water Warrior</Text>
-              <Text style={[styles.challengeSub, { color: themeColors.textSecondary }]}>Solve water problems</Text>
+          {/* Points Summary */}
+          <View style={styles.pointsContainer}>
+            <View style={styles.pointsBox}>
+              <Text style={[styles.pointsLabel, { color: themeColors.textSecondary }]}>Total Points</Text>
+              <Text style={[styles.pointsValue, { color: GoogleColors.green }]}>{user?.points ?? 0}</Text>
             </View>
           </View>
-          
-          <View style={[styles.progressBar, { backgroundColor: themeColors.backgroundElement }]}>
-            <View style={[styles.progressFill, { backgroundColor: GoogleColors.green, width: '60%' }]} />
-          </View>
-          <Text style={[styles.progressText, { color: themeColors.textSecondary }]}>3/5 Tasks Completed</Text>
-        </Card>
 
-        {/* Badges */}
-        <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 16 }]}>Your Badges</Text>
-        <View style={styles.badgesGrid}>
-          
-          <Card style={styles.badgeCard}>
-            <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.red + '20' }]}>
-              <MaterialIcons name="medical-services" size={32} color={GoogleColors.red} />
+          {/* AI Coach */}
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Your AI Coach</Text>
+          <Card style={[styles.coachCard, { borderColor: GoogleColors.blue, borderWidth: 1 }]}>
+            <View style={styles.coachHeader}>
+              <View style={[styles.iconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
+                <MaterialIcons name="smart-toy" size={24} color={GoogleColors.blue} />
+              </View>
+              <Text style={[styles.coachTitle, { color: themeColors.text }]}>Daily Tip</Text>
             </View>
-            <Text style={[styles.badgeName, { color: themeColors.text }]}>First Responder</Text>
+            <Text style={[styles.coachMessage, { color: themeColors.textSecondary }]}>
+              "Great job {localName.split(' ')[0]}! You helped 12 families last week. There's a small task near your route home today, want to check it out?"
+            </Text>
           </Card>
 
-          <Card style={styles.badgeCard}>
-            <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.green + '20' }]}>
-              <MaterialIcons name="translate" size={32} color={GoogleColors.green} />
+          {/* Monthly Challenge */}
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Monthly Challenge</Text>
+          <Card>
+            <View style={styles.challengeHeader}>
+              <View style={[styles.iconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
+                <MaterialIcons name="water-drop" size={24} color={GoogleColors.blue} />
+              </View>
+              <View style={styles.challengeTitleCol}>
+                <Text style={[styles.challengeTitle, { color: themeColors.text }]}>Water Warrior</Text>
+                <Text style={[styles.challengeSub, { color: themeColors.textSecondary }]}>Solve water problems</Text>
+              </View>
             </View>
-            <Text style={[styles.badgeName, { color: themeColors.text }]}>Local Voice</Text>
+
+            <View style={[styles.progressBar, { backgroundColor: themeColors.backgroundElement }]}>
+              <View style={[styles.progressFill, { backgroundColor: GoogleColors.green, width: '60%' }]} />
+            </View>
+            <Text style={[styles.progressText, { color: themeColors.textSecondary }]}>3/5 Tasks Completed</Text>
           </Card>
 
-          <Card style={styles.badgeCard}>
-            <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.yellow + '20' }]}>
-              <MaterialIcons name="bolt" size={32} color={GoogleColors.yellow} />
-            </View>
-            <Text style={[styles.badgeName, { color: themeColors.text }]}>Fast Actor</Text>
-          </Card>
+          {/* Badges */}
+          <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: 16 }]}>Your Badges</Text>
+          <View style={styles.badgesGrid}>
 
-        </View>
+            <Card style={styles.badgeCard}>
+              <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.red + '20' }]}>
+                <MaterialIcons name="medical-services" size={32} color={GoogleColors.red} />
+              </View>
+              <Text style={[styles.badgeName, { color: themeColors.text }]}>First Responder</Text>
+            </Card>
+
+            <Card style={styles.badgeCard}>
+              <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.green + '20' }]}>
+                <MaterialIcons name="translate" size={32} color={GoogleColors.green} />
+              </View>
+              <Text style={[styles.badgeName, { color: themeColors.text }]}>Local Voice</Text>
+            </Card>
+
+            <Card style={styles.badgeCard}>
+              <View style={[styles.largeIconBox, { backgroundColor: GoogleColors.yellow + '20' }]}>
+                <MaterialIcons name="bolt" size={32} color={GoogleColors.yellow} />
+              </View>
+              <Text style={[styles.badgeName, { color: themeColors.text }]}>Fast Actor</Text>
+            </Card>
+
+          </View>
         </ScrollView>
       </View>
 
@@ -155,7 +149,7 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
             <Text style={[styles.modalTitle, { color: themeColors.text }]}>Edit Profile</Text>
-            
+
             <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>Full Name</Text>
             <TextInput
               style={[styles.input, { color: themeColors.text, borderColor: themeColors.border }]}
@@ -166,16 +160,16 @@ export default function ProfileScreen() {
             />
 
             <View style={styles.modalActions}>
-              <GoogleButton 
-                title="Cancel" 
-                variant="outline" 
-                style={styles.modalBtn} 
-                onPress={() => setEditModalVisible(false)} 
+              <GoogleButton
+                title="Cancel"
+                variant="outline"
+                style={styles.modalBtn}
+                onPress={() => setEditModalVisible(false)}
               />
-              <GoogleButton 
-                title="Save" 
-                style={[styles.modalBtn, { backgroundColor: GoogleColors.blue }]} 
-                onPress={handleSaveProfile} 
+              <GoogleButton
+                title="Save"
+                style={[styles.modalBtn, { backgroundColor: GoogleColors.blue }]}
+                onPress={handleSaveProfile}
               />
             </View>
           </View>

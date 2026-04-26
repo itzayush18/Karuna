@@ -9,6 +9,7 @@ import {
   scoreTask,
   suggestMatches,
   authLogin,
+  authGoogleLogin,
   getGovernanceInsights,
 } from "./admin-api";
 import { AdminHeader } from "./admin-header";
@@ -111,6 +112,22 @@ export function AdminDashboard() {
       setTimeout(() => refreshAll(), 100);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async (url: string) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      setBaseUrl(url);
+      const { accessToken } = await authGoogleLogin(url);
+      setToken(accessToken);
+      setIsAuthenticated(true);
+      setTimeout(() => refreshAll(), 100);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Google authentication failed.");
     } finally {
       setLoading(false);
     }
@@ -299,6 +316,7 @@ export function AdminDashboard() {
             auditLogs={data.auditLogs}
             notifications={data.notifications}
             tasks={data.tasks}
+            governanceInsights={data.governanceInsights}
             onMarkNotificationRead={(id) =>
               runAction("Notification update", () => markNotificationRead(context, id))
             }
@@ -310,7 +328,7 @@ export function AdminDashboard() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} loading={loading} />;
+    return <Login onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} loading={loading} />;
   }
 
   return (
@@ -360,5 +378,3 @@ export function AdminDashboard() {
     </div>
   );
 }
-
-

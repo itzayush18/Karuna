@@ -33,3 +33,43 @@ export class LoginDto {
   @IsString()
   password: string;
 }
+
+export class FirebaseLoginDto {
+  @ApiProperty()
+  @IsString()
+  idToken: string;
+}
+
+export class FirebaseRegisterDto extends FirebaseLoginDto {
+  @ApiProperty()
+  @IsString()
+  fullName: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+}
+
+export class GoogleLoginDto {
+  @ApiProperty()
+  @IsString()
+  idToken: string;
+}
+
+export class GoogleRegisterDto extends GoogleLoginDto {
+  @ApiProperty()
+  @IsString()
+  fullName: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+}

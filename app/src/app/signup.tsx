@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, ActivityIndicator, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, ActivityIndicator, TouchableOpacity, Modal, FlatList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { GoogleButton } from '@/components/GoogleButton';
@@ -24,6 +24,7 @@ export default function SignUpScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [organizationsList, setOrganizationsList] = useState<Organization[]>([]);
   const [isOrgModalVisible, setOrgModalVisible] = useState(false);
@@ -53,7 +54,7 @@ export default function SignUpScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Sign Up Failed', error?.response?.data?.message || 'Could not create account');
+      Alert.alert('Sign Up Failed', error?.response?.data?.message || error?.message || 'Could not create account');
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +62,7 @@ export default function SignUpScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
-      
+
       {/* Background Shapes Layer */}
       <View style={StyleSheet.absoluteFillObject}>
         <View style={[styles.blob, styles.greenBlob, { backgroundColor: GoogleColors.green }]} />
@@ -93,17 +94,22 @@ export default function SignUpScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TextInput
-              style={[styles.input, { color: textColor }]}
-              placeholder="Password"
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, { color: textColor }]}
+                placeholder="Password"
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <Pressable style={styles.eyeButton} onPress={() => setShowPassword((value) => !value)}>
+                <MaterialIcons name={showPassword ? 'visibility-off' : 'visibility'} size={22} color="rgba(255,255,255,0.7)" />
+              </Pressable>
+            </View>
 
-            <TouchableOpacity 
-              style={[styles.input, styles.dropdownInput]} 
+            <TouchableOpacity
+              style={[styles.input, styles.dropdownInput]}
               onPress={() => setOrgModalVisible(true)}
             >
               <Text style={{ color: organization ? textColor : 'rgba(255,255,255,0.5)', fontFamily: 'Poppins_400Regular', fontSize: 16 }}>
@@ -111,12 +117,12 @@ export default function SignUpScreen() {
               </Text>
               <MaterialIcons name="arrow-drop-down" size={24} color="rgba(255,255,255,0.5)" />
             </TouchableOpacity>
-            
+
             {isLoading ? (
               <ActivityIndicator size="large" color={GoogleColors.blue} style={styles.loader} />
             ) : (
-              <GoogleButton 
-                title="SIGN UP" 
+              <GoogleButton
+                title="SIGN UP"
                 onPress={handleSignUp}
                 style={styles.button}
                 textStyle={styles.buttonText}
@@ -139,7 +145,7 @@ export default function SignUpScreen() {
               data={organizationsList}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.orgItem, organization?.id === item.id && { backgroundColor: 'rgba(255,255,255,0.1)' }]}
                   onPress={() => {
                     setOrganization(item);
@@ -151,11 +157,11 @@ export default function SignUpScreen() {
                 </TouchableOpacity>
               )}
             />
-            <GoogleButton 
-              title="Cancel" 
-              variant="outline" 
-              style={{ marginTop: 16 }} 
-              onPress={() => setOrgModalVisible(false)} 
+            <GoogleButton
+              title="Cancel"
+              variant="outline"
+              style={{ marginTop: 16 }}
+              onPress={() => setOrgModalVisible(false)}
             />
           </View>
         </View>
@@ -228,6 +234,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  passwordField: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 56,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    padding: 8,
+  },
   loader: {
     marginTop: 20,
   },
@@ -243,7 +261,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   buttonText: {
-    color: '#000000', 
+    color: '#000000',
     fontFamily: 'Poppins_700Bold',
     fontSize: 16,
     letterSpacing: 1,

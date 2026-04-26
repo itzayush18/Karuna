@@ -18,7 +18,8 @@ try {
   ImagePicker = require('expo-image-picker');
   Audio = require('expo-av').Audio;
 } catch (e) {
-  console.warn('Native modules for Camera/Audio not found. Please rebuild the app.');
+  ImagePicker = null;
+  Audio = null;
 }
 
 export default function ReportScreen() {

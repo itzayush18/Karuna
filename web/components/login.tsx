@@ -4,13 +4,14 @@ import React, { useState } from "react";
 
 interface LoginProps {
   onLogin: (baseUrl: string, credentials: { email: string; password?: string }) => void;
+  onGoogleLogin: (baseUrl: string) => void;
   loading?: boolean;
 }
 
-export function Login({ onLogin, loading }: LoginProps) {
+export function Login({ onLogin, onGoogleLogin, loading }: LoginProps) {
   const [baseUrl, setBaseUrl] = useState("http://localhost:3000");
-  const [email, setEmail] = useState("admin@karuna.local");
-  const [password, setPassword] = useState("Password123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,6 +84,16 @@ export function Login({ onLogin, loading }: LoginProps) {
             className="btn-premium-primary w-full py-4 text-base shadow-lg hover:shadow-xl disabled:opacity-50"
           >
             {loading ? "Authenticating..." : "Connect to Dashboard"}
+          </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => onGoogleLogin(baseUrl)}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+          >
+            <span className="text-lg font-extrabold text-blue-600">G</span>
+            Continue with Google
           </button>
         </form>
 
