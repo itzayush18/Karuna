@@ -21,10 +21,13 @@ export class FirebaseAdminService {
       return;
     }
 
-    initializeApp({
-      credential: applicationDefault(),
-      projectId,
-    });
+    try {
+      initializeApp({
+        projectId: projectId || 'karuna-3e839',
+      });
+    } catch (e) {
+      // Ignore if already initialized
+    }
   }
 
   async verifyIdToken(idToken: string): Promise<DecodedIdToken> {

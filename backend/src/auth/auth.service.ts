@@ -140,8 +140,9 @@ export class AuthService {
     const firebaseUser = await this.firebase.verifyIdToken(dto.idToken);
     if (!firebaseUser.email) throw new UnauthorizedException('Firebase account does not include an email');
 
+    let email = firebaseUser.email.toLowerCase();
     let user = await this.prisma.user.findUnique({
-      where: { email: firebaseUser.email.toLowerCase() },
+      where: { email },
       include: { role: true },
     });
 
@@ -149,8 +150,33 @@ export class AuthService {
       user = await this.createFirebaseProvisionedUser(firebaseUser);
     }
 
-    if (!user || !user.active) {
-      throw new UnauthorizedException('No active Karuna account is linked to this Firebase email');
+    if (!user) {
+      // Auto-register the new joinee if they were added manually in Firebase
+      const volunteerRole = await this.prisma.role.findUnique({ where: { name: RoleName.VOLUNTEER } });
+      if (!volunteerRole) throw new ConflictException('Seed roles before registering users');
+
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          fullName: firebaseUser.name || email.split('@')[0],
+          passwordHash: await bcrypt.hash(`firebase:${firebaseUser.uid}`, 12),
+          roleId: volunteerRole.id,
+          volunteer: {
+            create: {
+              workloadScore: 0,
+              fatigueScore: 0,
+              performanceScore: 0,
+              points: 0,
+              badges: [],
+            },
+          },
+        },
+        include: { role: true },
+      });
+    }
+
+    if (!user.active) {
+      throw new UnauthorizedException('This Karuna account has been deactivated');
     }
 
     await this.prisma.auditLog.create({

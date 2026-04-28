@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../api/client';
+import { auth } from '../config/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export interface User {
   id: string;
@@ -49,7 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+      
+      const response = await apiClient.post('/auth/firebase/login', { idToken });
       const { accessToken } = response.data.data;
 
       if (accessToken) {
@@ -65,7 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, fullName: string, password: string, organizationId?: string) => {
     try {
-      const response = await apiClient.post('/auth/register', { email, fullName, password, organizationId });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+      
+      const response = await apiClient.post('/auth/firebase/register', { idToken, fullName, organizationId });
       const { accessToken } = response.data.data;
 
       if (accessToken) {
@@ -75,13 +83,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No token returned');
       }
     } catch (error) {
+      // If backend registration fails, we might want to clean up the Firebase user, 
+      // but for now we'll just throw the error
       throw error;
     }
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('auth_token');
-    setUser(null);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Firebase sign out error', error);
+    } finally {
+      await AsyncStorage.removeItem('auth_token');
+      setUser(null);
+    }
   };
 
   return (
