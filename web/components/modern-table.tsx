@@ -26,34 +26,40 @@ export function ModernTable<T extends { id: string | number }>({
   actions,
 }: ModernTableProps<T>) {
   return (
-    <div className="card-premium overflow-hidden">
+    <div className="card-premium" style={{ overflow: "hidden" }}>
       {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--line)] bg-slate-50/50 px-6 py-4">
-          {title && <h3 className="section-title text-lg font-bold text-slate-900">{title}</h3>}
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "14px 20px", borderBottom: "1px solid var(--line)",
+          background: "var(--bg-soft)",
+        }}>
+          {title && (
+            <h3 className="section-title" style={{ fontSize: "0.95rem", color: "var(--text-primary)" }}>
+              {title}
+            </h3>
+          )}
+          {actions && <div style={{ display: "flex", gap: 8 }}>{actions}</div>}
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <div style={{ overflowX: "auto" }}>
+        <table className="data-table">
+          <thead>
             <tr>
-              {columns.map((column, index) => (
-                <th key={index} className={`px-6 py-3 ${column.className || ""}`}>
-                  {column.header}
-                </th>
+              {columns.map((column, i) => (
+                <th key={i} className={column.className}>{column.header}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--line)]">
+          <tbody>
             {data.length > 0 ? (
               data.map((item) => (
                 <tr
                   key={item.id}
                   onClick={() => onRowClick?.(item)}
-                  className={`transition-colors hover:bg-slate-50 ${onRowClick ? "cursor-pointer" : ""}`}
+                  style={{ cursor: onRowClick ? "pointer" : "default" }}
                 >
                   {columns.map((column, colIndex) => (
-                    <td key={colIndex} className={`whitespace-nowrap px-6 py-4 text-slate-700 ${column.className || ""}`}>
+                    <td key={colIndex} className={column.className} style={{ color: "var(--text-primary)" }}>
                       {typeof column.accessor === "function"
                         ? column.accessor(item)
                         : (item[column.accessor] as React.ReactNode)}
@@ -63,7 +69,7 @@ export function ModernTable<T extends { id: string | number }>({
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={columns.length} style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontSize: "0.875rem" }}>
                   {emptyMessage}
                 </td>
               </tr>

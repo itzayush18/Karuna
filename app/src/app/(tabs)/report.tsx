@@ -13,13 +13,16 @@ import { useAuth } from '@/context/AuthContext';
 // if the development build hasn't been recompiled yet.
 let ImagePicker: any;
 let Audio: any;
+let DocumentPicker: any;
 
 try {
   ImagePicker = require('expo-image-picker');
   Audio = require('expo-av').Audio;
+  DocumentPicker = require('expo-document-picker');
 } catch (e) {
   ImagePicker = null;
   Audio = null;
+  DocumentPicker = null;
 }
 
 export default function ReportScreen() {
@@ -34,11 +37,28 @@ export default function ReportScreen() {
   
   const inputRef = useRef<TextInput>(null);
 
-  const uploadMedia = async (reportId: string, uri: string, type: 'image' | 'audio') => {
+  const inferMimeType = (uri: string, type: 'image' | 'audio' | 'document', mimeType?: string | null) => {
+    if (mimeType) return mimeType;
+    const extension = uri.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf') return 'application/pdf';
+    if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+    if (extension === 'png') return 'image/png';
+    if (extension === 'webp') return 'image/webp';
+    if (extension === 'm4a') return 'audio/m4a';
+    if (extension === 'mp3') return 'audio/mpeg';
+    if (extension === 'wav') return 'audio/wav';
+    return type === 'document' ? 'application/pdf' : type;
+  };
+
+  const uploadMedia = async (
+    reportId: string,
+    uri: string,
+    type: 'image' | 'audio' | 'document',
+    options?: { name?: string | null; mimeType?: string | null },
+  ) => {
     const formData = new FormData();
-    const filename = uri.split('/').pop();
-    const match = /\.(\w+)$/.exec(filename || '');
-    const fileType = match ? `${type}/${match[1]}` : type;
+    const filename = options?.name || uri.split('/').pop() || `${type}-${Date.now()}`;
+    const fileType = inferMimeType(uri, type, options?.mimeType);
 
     // @ts-ignore
     formData.append('file', {
@@ -80,7 +100,10 @@ export default function ReportScreen() {
           source: 'IMAGE',
           idempotencyKey: `report-img-${Date.now()}`
         });
-        await uploadMedia(reportRes.data.data.id, result.assets[0].uri, 'image');
+        await uploadMedia(reportRes.data.data.id, result.assets[0].uri, 'image', {
+          name: result.assets[0].fileName,
+          mimeType: result.assets[0].mimeType,
+        });
         Alert.alert('Success', 'Image report submitted successfully.');
       } catch (error) {
         Alert.alert('Error', 'Failed to submit image report.');
@@ -152,6 +175,41 @@ export default function ReportScreen() {
   };
 
   const [isManualModalVisible, setManualModalVisible] = useState(false);
+
+  const handleFileUpload = async () => {
+    if (!DocumentPicker || typeof DocumentPicker.getDocumentAsync !== 'function') {
+      Alert.alert('Module not found', 'File upload requires a rebuild after installing expo-document-picker.');
+      return;
+    }
+
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+    const file = result.assets[0];
+    const isPdf = file.mimeType === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+
+    setIsSubmitting(true);
+    try {
+      const reportRes = await apiClient.post('/reports', {
+        source: isPdf ? 'FORM' : 'IMAGE',
+        idempotencyKey: `report-file-${Date.now()}`,
+      });
+      await uploadMedia(reportRes.data.data.id, file.uri, isPdf ? 'document' : 'image', {
+        name: file.name,
+        mimeType: file.mimeType,
+      });
+      Alert.alert('Success', 'File report uploaded. AI can now process it.');
+    } catch (error) {
+      console.error('File upload failed', error);
+      Alert.alert('Error', 'Failed to upload file report.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!reportText.trim()) {
@@ -232,6 +290,16 @@ export default function ReportScreen() {
               </View>
               <Text style={[styles.gridTitle, { color: themeColors.text }]}>WhatsApp</Text>
               <Text style={[styles.gridDesc, { color: themeColors.textSecondary }]}>Forwarded</Text>
+            </Card>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridItemWrapper} onPress={handleFileUpload}>
+            <Card style={styles.gridItem}>
+              <View style={[styles.iconBox, { backgroundColor: GoogleColors.blue + '20' }]}>
+                <MaterialIcons name="upload-file" size={28} color={GoogleColors.blue} />
+              </View>
+              <Text style={[styles.gridTitle, { color: themeColors.text }]}>Upload</Text>
+              <Text style={[styles.gridDesc, { color: themeColors.textSecondary }]}>PDF/Image</Text>
             </Card>
           </TouchableOpacity>
 

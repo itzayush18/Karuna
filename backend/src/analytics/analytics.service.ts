@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { DashboardFilterDto, optionalDateRangeWhere } from '../common/dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { ReferenceDataService } from './reference-data.service';
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
+    private readonly referenceData: ReferenceDataService,
   ) {}
 
   async impactSummary(query: DashboardFilterDto) {
@@ -59,7 +61,7 @@ export class AnalyticsService {
   }
 
   async aiInsightFeed() {
-    const [reports, tasks, predictions, volunteers, auditLogs] = await Promise.all([
+    const [reports, tasks, predictions, volunteers, auditLogs, referenceData] = await Promise.all([
       this.prisma.communityReport.findMany({
         take: 40,
         orderBy: { createdAt: 'desc' },
@@ -83,6 +85,7 @@ export class AnalyticsService {
         take: 30,
         orderBy: { createdAt: 'desc' },
       }),
+      this.referenceData.latestForPrompt(),
     ]);
 
     return this.ai.generateDashboardInsights({
@@ -127,6 +130,7 @@ export class AnalyticsService {
         entityType: log.entityType,
         createdAt: log.createdAt,
       })),
+      referenceData,
     });
   }
 

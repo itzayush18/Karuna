@@ -8,6 +8,24 @@ import {
   VolunteerView,
 } from "./models";
 
+const COLORS = {
+  blue:   { hex: "#4285F4", bg: "#e8f0fe" },
+  red:    { hex: "#DB4437", bg: "#fce8e6" },
+  yellow: { hex: "#F4B400", bg: "#fef7e0" },
+  green:  { hex: "#0F9D58", bg: "#e6f4ea" },
+};
+
+function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  const entry = Object.values(COLORS).find((c) => c.hex === color);
+  const bg = entry?.bg ?? "var(--bg-soft)";
+  return (
+    <div className="stat-mini" style={{ textAlign: "center" }}>
+      <p style={{ fontSize: "0.68rem", color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
+      <p style={{ fontSize: "1.6rem", fontWeight: 800, color: color ?? "var(--text-primary)", marginTop: 4, lineHeight: 1.1 }}>{value}</p>
+    </div>
+  );
+}
+
 type DataCollectionProps = {
   reports: ReportView[];
   pendingReports: ReportView[];
@@ -26,36 +44,35 @@ export function DataCollectionPanel({
   onProcessReport,
 }: DataCollectionProps) {
   return (
-    <article className="card-premium p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="section-title text-xl">AI Data Intake</h2>
-        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-          Total Reports: {reports.length}
-        </span>
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#DB4437" }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <h2 className="section-title" style={{ fontSize: "1.1rem", color: "var(--text-primary)" }}>AI Data Intake</h2>
+        <span className="badge badge-red">Reports: {reports.length}</span>
       </div>
-      <p className="mt-2 text-sm text-slate-500">
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>
         Monitoring AI extraction logs and media processing status.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Pending AI" value={String(pendingReports.length)} color="var(--warning)" />
-        <StatCard label="AI Logs" value={String(aiLogs.length)} color="var(--primary)" />
-        <StatCard label="Processed" value={String(reports.length - pendingReports.length)} color="var(--success)" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+        <StatCard label="Pending AI" value={String(pendingReports.length)} color={COLORS.yellow.hex} />
+        <StatCard label="AI Logs" value={String(aiLogs.length)} color={COLORS.blue.hex} />
+        <StatCard label="Processed" value={String(reports.length - pendingReports.length)} color={COLORS.green.hex} />
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Manual Process Report ID</label>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+            Manual Process Report ID
+          </label>
           <input
             className="input-premium"
             value={selectedReportId}
-            onChange={(event) => onSelectReportId(event.target.value)}
-            placeholder="Enter report ID..."
+            onChange={(e) => onSelectReportId(e.target.value)}
+            placeholder="Enter report ID…"
           />
         </div>
-        <button type="button" className="btn-premium-primary" onClick={onProcessReport}>
-          Run AI Triage
-        </button>
+        <button className="btn-primary" onClick={onProcessReport}>Run AI Triage</button>
       </div>
     </article>
   );
@@ -78,54 +95,55 @@ export function UrgencyPanel({
   onSelectTaskId,
   onScoreTask,
 }: UrgencyProps) {
-  const red = urgentTasks.filter((task) => (task.urgencyScores?.[0]?.score ?? 0) >= 80).length;
-  const yellow = urgentTasks.filter((task) => {
-    const score = task.urgencyScores?.[0]?.score ?? 0;
-    return score >= 50 && score < 80;
-  }).length;
-  const green = urgentTasks.filter((task) => (task.urgencyScores?.[0]?.score ?? 0) < 50).length;
+  const red    = urgentTasks.filter((t) => (t.urgencyScores?.[0]?.score ?? 0) >= 80).length;
+  const yellow = urgentTasks.filter((t) => { const s = t.urgencyScores?.[0]?.score ?? 0; return s >= 50 && s < 80; }).length;
+  const green  = urgentTasks.filter((t) => (t.urgencyScores?.[0]?.score ?? 0) < 50).length;
 
   return (
-    <article className="card-premium p-6">
-      <h2 className="section-title text-xl">Urgency Intelligence</h2>
-      <p className="mt-2 text-sm text-slate-500">
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#DB4437" }} />
+      <h2 className="section-title" style={{ fontSize: "1.1rem", color: "var(--text-primary)", marginBottom: 6 }}>
+        Urgency Intelligence
+      </h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>
         Live intervention priority based on real-time algorithm scoring.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
         <StatCard label="Map Tasks" value={String(mapTasks.length)} />
-        <StatCard label="Critical" value={String(red)} color="var(--google-red)" />
-        <StatCard label="High" value={String(yellow)} color="var(--google-yellow)" />
-        <StatCard label="Normal" value={String(green)} color="var(--google-green)" />
+        <StatCard label="Critical" value={String(red)} color={COLORS.red.hex} />
+        <StatCard label="High" value={String(yellow)} color={COLORS.yellow.hex} />
+        <StatCard label="Normal" value={String(green)} color={COLORS.green.hex} />
       </div>
 
-      <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-slate-900">Village Coverage</p>
-          <p className="text-xs text-slate-500">{villageCount} Villages Tracked</p>
+      {/* Village heatmap */}
+      <div style={{ background: "var(--bg-soft)", borderRadius: 10, padding: 14, marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-primary)" }}>Village Coverage</p>
+          <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{villageCount} villages tracked</p>
         </div>
-        <div className="mt-3 grid grid-cols-6 gap-2">
-          {[...Array(12)].map((_, index) => {
-            const value = index % 3;
-            const color = value === 0 ? "var(--google-red)" : value === 1 ? "var(--google-yellow)" : "var(--google-green)";
-            return <div key={index} className="h-6 rounded-md opacity-80" style={{ backgroundColor: color }} />;
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+          {[...Array(12)].map((_, i) => {
+            const v = i % 3;
+            const c = v === 0 ? COLORS.red.hex : v === 1 ? COLORS.yellow.hex : COLORS.green.hex;
+            return <div key={i} style={{ height: 20, borderRadius: 6, background: c, opacity: 0.7 }} />;
           })}
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Re-calculate Task ID</label>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+            Re-calculate Task ID
+          </label>
           <input
             className="input-premium"
             value={selectedTaskId}
-            onChange={(event) => onSelectTaskId(event.target.value)}
-            placeholder="Enter task ID..."
+            onChange={(e) => onSelectTaskId(e.target.value)}
+            placeholder="Enter task ID…"
           />
         </div>
-        <button type="button" className="btn-premium-secondary" onClick={onScoreTask}>
-          Re-score Urgency
-        </button>
+        <button className="btn-secondary" onClick={onScoreTask}>Re-score Urgency</button>
       </div>
     </article>
   );
@@ -147,44 +165,58 @@ export function MatchingPanel({
   suggestions,
 }: MatchingProps) {
   return (
-    <article className="card-premium p-6">
-      <h2 className="section-title text-xl">Assignment Optimization</h2>
-      <p className="mt-2 text-sm text-slate-500">
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#4285F4" }} />
+      <h2 className="section-title" style={{ fontSize: "1.1rem", color: "var(--text-primary)", marginBottom: 6 }}>
+        Assignment Optimization
+      </h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>
         Best-fit matching considering fatigue, performance, and distance.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
         <StatCard label="Volunteers" value={String(volunteers.length)} />
-        <StatCard label="Low Fatigue" value={String(volunteers.filter((v) => (v.fatigueScore ?? 0) < 50).length)} color="var(--success)" />
-        <StatCard label="Matches" value={String(suggestions.length)} color="var(--primary)" />
+        <StatCard label="Low Fatigue" value={String(volunteers.filter((v) => (v.fatigueScore ?? 0) < 50).length)} color={COLORS.green.hex} />
+        <StatCard label="Matches" value={String(suggestions.length)} color={COLORS.blue.hex} />
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Suggest for Task ID</label>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+            Suggest for Task ID
+          </label>
           <input
             className="input-premium"
             value={selectedTaskId}
-            onChange={(event) => onSelectTaskId(event.target.value)}
-            placeholder="Enter task ID..."
+            onChange={(e) => onSelectTaskId(e.target.value)}
+            placeholder="Enter task ID…"
           />
         </div>
-        <button type="button" className="btn-premium-primary" onClick={onSuggestMatch}>
-          Optimize Match
-        </button>
+        <button className="btn-primary" onClick={onSuggestMatch}>Optimize Match</button>
       </div>
 
       {suggestions.length > 0 && (
-        <div className="mt-6 space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {suggestions.slice(0, 3).map((item) => (
-            <div key={item.volunteer.id} className="flex items-center justify-between rounded-xl border border-[var(--line)] p-4">
+            <div
+              key={item.volunteer.id}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 10,
+                background: "var(--bg-soft)",
+              }}
+            >
               <div>
-                <p className="font-semibold text-slate-900">{item.volunteer.name}</p>
-                <p className="text-xs text-slate-500">{Object.values(item.explanation).slice(0, 1).join("")}</p>
+                <p style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--text-primary)" }}>{item.volunteer.name}</p>
+                <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
+                  {Object.values(item.explanation).slice(0, 1).join("")}
+                </p>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-blue-600">{(item.score * 100).toFixed(0)}%</p>
-                <p className="text-[10px] uppercase font-bold text-slate-400">Match Score</p>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: "1.2rem", fontWeight: 800, color: COLORS.blue.hex }}>
+                  {(item.score * 100).toFixed(0)}%
+                </p>
+                <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>Match</p>
               </div>
             </div>
           ))}
@@ -194,135 +226,139 @@ export function MatchingPanel({
   );
 }
 
-type PredictionProps = {
-  predictions: PredictionView[];
-  onGenerate: () => void;
-};
+type PredictionProps = { predictions: PredictionView[]; onGenerate: () => void };
 
 export function PredictionsPanel({ predictions, onGenerate }: PredictionProps) {
   return (
-    <article className="card-premium p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="section-title text-xl">Predictive Early Warning</h2>
-        <button type="button" className="btn-premium-secondary text-xs" onClick={onGenerate}>
-          Update Forecast
-        </button>
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#DB4437" }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <h2 className="section-title" style={{ fontSize: "1.1rem" }}>Predictive Early Warning</h2>
+        <button className="btn-secondary" style={{ fontSize: "0.78rem", padding: "6px 12px" }} onClick={onGenerate}>Update Forecast</button>
       </div>
-      <p className="mt-2 text-sm text-slate-500">
-        AI forecasting for future resource shortages.
-      </p>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>AI forecasting for future resource shortages.</p>
 
-      <div className="mt-6 space-y-4">
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {predictions.slice(0, 3).map((prediction) => (
-          <div key={prediction.id} className="group relative overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-50/50 p-4 transition-all hover:bg-white hover:shadow-md">
-            <div className="flex items-start justify-between">
+          <div
+            key={prediction.id}
+            style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "14px 16px", background: "var(--bg-soft)", transition: "all 0.2s" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div>
-                <p className="font-bold text-slate-900">{prediction.title}</p>
-                <p className="text-xs text-slate-500 uppercase font-semibold mt-0.5">{prediction.type}</p>
+                <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-primary)" }}>{prediction.title}</p>
+                <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, marginTop: 2 }}>{prediction.type}</p>
               </div>
-              <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600">
-                {Math.round(prediction.confidence * 100)}% Confidence
-              </span>
+              <span className="badge badge-blue">{Math.round(prediction.confidence * 100)}% conf.</span>
             </div>
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-              <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${Math.round(prediction.confidence * 100)}%` }} />
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${Math.round(prediction.confidence * 100)}%`, background: "#4285F4" }} />
             </div>
           </div>
         ))}
-        {predictions.length === 0 && <p className="py-8 text-center text-sm text-slate-400">No predictions generated yet.</p>}
+        {predictions.length === 0 && (
+          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+            No predictions generated yet.
+          </div>
+        )}
       </div>
     </article>
   );
 }
 
-type EngagementProps = {
-  activeVolunteers: VolunteerView[];
-  notificationsUnread: number;
-};
+type EngagementProps = { activeVolunteers: VolunteerView[]; notificationsUnread: number };
 
 export function EngagementPanel({ activeVolunteers, notificationsUnread }: EngagementProps) {
-  const topVolunteers = [...activeVolunteers]
-    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
-    .slice(0, 4);
+  const topVolunteers = [...activeVolunteers].sort((a, b) => (b.points ?? 0) - (a.points ?? 0)).slice(0, 5);
+  const AVATAR_COLORS = [COLORS.blue.hex, COLORS.red.hex, COLORS.yellow.hex, COLORS.green.hex];
 
   return (
-    <article className="card-premium p-6">
-      <h2 className="section-title text-xl">Volunteer Engagement</h2>
-      <p className="mt-2 text-sm text-slate-500">
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#0F9D58" }} />
+      <h2 className="section-title" style={{ fontSize: "1.1rem", color: "var(--text-primary)", marginBottom: 6 }}>
+        Volunteer Engagement
+      </h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>
         Activity tracking and point-based growth system.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <StatCard label="Active Now" value={String(activeVolunteers.length)} color="var(--primary)" />
-        <StatCard label="Unread Alerts" value={String(notificationsUnread)} color="var(--google-red)" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+        <StatCard label="Active Now" value={String(activeVolunteers.length)} color={COLORS.blue.hex} />
+        <StatCard label="Unread Alerts" value={String(notificationsUnread)} color={COLORS.red.hex} />
       </div>
 
-      <div className="mt-6">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Top Performers</p>
-        <div className="space-y-3">
-          {topVolunteers.map((volunteer) => (
-            <div key={volunteer.id} className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                {volunteer.user?.fullName?.charAt(0) ?? "V"}
+      <p style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
+        Top Performers
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {topVolunteers.map((v, i) => (
+          <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: "50%",
+              background: AVATAR_COLORS[i % AVATAR_COLORS.length],
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "white", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0,
+            }}>
+              {v.user?.fullName?.charAt(0) ?? "V"}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-primary)" }}>{v.user?.fullName ?? "Volunteer"}</p>
+                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: COLORS.green.hex }}>{v.points ?? 0} pts</span>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-slate-900">{volunteer.user?.fullName ?? "Volunteer"}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-slate-500">{volunteer.points ?? 0} Points</span>
-                  <div className="h-1 w-1 rounded-full bg-slate-300" />
-                  <span className="text-[10px] text-slate-500">Perf: {volunteer.performanceScore ?? 0}</span>
-                </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${Math.min(100, (v.points ?? 0) / 2)}%`, background: AVATAR_COLORS[i % AVATAR_COLORS.length] }} />
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+        {topVolunteers.length === 0 && (
+          <div style={{ textAlign: "center", padding: "16px 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+            No volunteer data yet.
+          </div>
+        )}
       </div>
     </article>
   );
 }
 
-type ImpactProps = {
-  impactSummary: ImpactSummary | null;
-  ngoReport: NgoReport | null;
-};
+type ImpactProps = { impactSummary: ImpactSummary | null; ngoReport: NgoReport | null };
 
 export function ImpactPanel({ impactSummary, ngoReport }: ImpactProps) {
   const metrics = Object.entries(impactSummary?.metrics ?? {}).slice(0, 4);
 
   return (
-    <article className="card-premium p-6">
-      <h2 className="section-title text-xl">Impact Metrics</h2>
-      <p className="mt-2 text-sm text-slate-500">
+    <article className="card-premium" style={{ padding: 24, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#0F9D58" }} />
+      <h2 className="section-title" style={{ fontSize: "1.1rem", color: "var(--text-primary)", marginBottom: 6 }}>
+        Impact Metrics
+      </h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 18 }}>
         Transparent reporting on humanitarian outcomes.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 18 }}>
         {metrics.map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-[var(--line)] bg-slate-50/50 p-4">
-            <p className="text-xs font-medium text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+          <div key={label} style={{ background: "var(--bg-soft)", borderRadius: 10, padding: 14, border: "1px solid var(--line)" }}>
+            <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>{label}</p>
+            <p style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", marginTop: 4 }}>{value as string}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 rounded-2xl bg-blue-50 p-5">
-        <div className="flex items-center gap-2 mb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Auto-Generated Impact Summary</p>
+      <div style={{ background: COLORS.blue.bg, borderRadius: 10, padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.blue.hex} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <p style={{ fontSize: "0.68rem", fontWeight: 700, color: COLORS.blue.hex, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Auto-Generated Impact Summary
+          </p>
         </div>
-        <p className="text-sm leading-relaxed text-blue-900/80">{ngoReport?.summary ?? "Synthesizing latest field data for impact report..."}</p>
+        <p style={{ fontSize: "0.8rem", color: "var(--text-primary)", lineHeight: 1.6 }}>
+          {ngoReport?.summary ?? "Synthesizing latest field data for impact report…"}
+        </p>
       </div>
     </article>
-  );
-}
-
-function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded-2xl border border-[var(--line)] p-4 transition-all hover:border-slate-300">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold" style={{ color: color ?? 'var(--foreground)' }}>
-        {value}
-      </p>
-    </div>
   );
 }

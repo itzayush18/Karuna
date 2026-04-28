@@ -39,7 +39,9 @@ export class ReportsService {
         status: ProcessingStatus.UPLOADED,
       },
     });
-    void this.processAndCreateTask(report.id);
+    if (report.rawText || report.formData || report.source === ReportSource.TEXT || report.source === ReportSource.SYNC) {
+      void this.processAndCreateTask(report.id);
+    }
     return report;
   }
 

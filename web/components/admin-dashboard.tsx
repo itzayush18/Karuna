@@ -12,6 +12,7 @@ import {
   authGoogleLogin,
   getGovernanceInsights,
   getAiInsightFeed,
+  ingestReferenceData,
 } from "./admin-api";
 import {
   DataCollectionPanel,
@@ -20,7 +21,8 @@ import {
   UrgencyPanel,
 } from "./feature-panels";
 import { AdminDataState, DashboardFilters, MatchSuggestion, RequestContext } from "./models";
-import { NavItem, Sidebar } from "./sidebar";
+import { NavItem } from "./top-nav";
+import { TopNav } from "./top-nav";
 import { StatsGrid } from "./stats-grid";
 import { ModernTable } from "./modern-table";
 import {
@@ -31,13 +33,9 @@ import {
   InsightDashboard,
   PredictionsDashboard,
 } from "./ai-governance-panels";
-
 import { Login } from "./login";
 
-const defaultFilters: DashboardFilters = {
-  page: 1,
-  limit: 20,
-};
+const defaultFilters: DashboardFilters = { page: 1, limit: 20 };
 
 const initialState: AdminDataState = {
   urgentSummary: null,
@@ -61,6 +59,7 @@ const initialState: AdminDataState = {
   aiLogs: [],
   governanceInsights: "",
   aiInsightFeed: [],
+  referenceDataset: null,
 };
 
 async function refreshDashboardData(
@@ -70,13 +69,58 @@ async function refreshDashboardData(
   setErrors: React.Dispatch<React.SetStateAction<Partial<Record<keyof AdminDataState, string>>>>,
 ) {
   const result = await loadAdminData({ ...context, token: currentToken });
-  const [insights, aiInsightFeed] = await Promise.all([
-    getGovernanceInsights({ ...context, token: currentToken }),
-    getAiInsightFeed({ ...context, token: currentToken }).catch(() => []),
-  ]);
-  setData((prev) => ({ ...prev, ...result.data, governanceInsights: insights, aiInsightFeed }));
+  if (
+    Object.values(result.errors).some(
+      (message) => message.includes("status 401") || message.toLowerCase().includes("unauthorized"),
+    )
+  ) {
+    throw new Error("AUTH_EXPIRED");
+  }
+  const insights = await getGovernanceInsights({ ...context, token: currentToken });
+  setData((prev) => ({ ...prev, ...result.data, governanceInsights: insights }));
   setErrors(result.errors);
   return result.errors;
+}
+
+const PAGE_META: Record<NavItem, { title: string; sub: string; iconColor: string; bgColor: string }> = {
+  overview:    { title: "Overview",         sub: "Mission control at a glance",           iconColor: "#4285F4", bgColor: "#e8f0fe" },
+  reports:     { title: "Reports",          sub: "AI data intake & field reports",         iconColor: "#DB4437", bgColor: "#fce8e6" },
+  tasks:       { title: "Tasks",            sub: "Assignment optimization & task roster",  iconColor: "#F4B400", bgColor: "#fef7e0" },
+  volunteers:  { title: "Volunteers",       sub: "Engagement & top performer tracking",    iconColor: "#0F9D58", bgColor: "#e6f4ea" },
+  ai:          { title: "AI Insights",      sub: "Gemini-verified signal cockpit",         iconColor: "#4285F4", bgColor: "#e8f0fe" },
+  predictions: { title: "Predictions",      sub: "Early warning & predictive signals",     iconColor: "#DB4437", bgColor: "#fce8e6" },
+  governance:  { title: "Governance",       sub: "Fairness, load & regional distribution", iconColor: "#F4B400", bgColor: "#fef7e0" },
+  audit:       { title: "Audit Logs",       sub: "Transparent action history",             iconColor: "#0F9D58", bgColor: "#e6f4ea" },
+  impact:      { title: "Impact Reports",   sub: "Humanitarian outcomes & analytics",      iconColor: "#4285F4", bgColor: "#e8f0fe" },
+};
+
+function PageBanner({ page, lastRefresh }: { page: NavItem; lastRefresh: string }) {
+  const meta = PAGE_META[page];
+  return (
+    <div className="page-banner">
+      <div className="page-banner-left">
+        <div className="page-banner-icon" style={{ background: meta.bgColor }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={meta.iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/>
+            <rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
+          </svg>
+        </div>
+        <div>
+          <h1 className="section-title" style={{ fontSize: "1.3rem", color: "var(--text-primary)" }}>{meta.title}</h1>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2 }}>
+            {meta.sub} · Last sync {lastRefresh}
+          </p>
+        </div>
+      </div>
+
+      {/* Google color pills */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {["#4285F4","#DB4437","#F4B400","#0F9D58"].map((c, i) => (
+          <span key={i} style={{ display: "inline-block", width: 24, height: 6, borderRadius: 99, background: c }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function AdminDashboard() {
@@ -99,22 +143,22 @@ export function AdminDashboard() {
   const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>([]);
   const [activeItem, setActiveItem] = useState<NavItem>("overview");
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(token));
+
   const selectedTask = useMemo(
-    () => data.tasks.find((task) => task.id === selectedTaskId) ?? data.urgentTasks.find((task) => task.id === selectedTaskId),
+    () =>
+      data.tasks.find((task) => task.id === selectedTaskId) ??
+      data.urgentTasks.find((task) => task.id === selectedTaskId),
     [data.tasks, data.urgentTasks, selectedTaskId],
   );
   const selectedReport = useMemo(
-    () => data.reports.find((report) => report.id === selectedReportId) ?? data.pendingReports.find((report) => report.id === selectedReportId),
+    () =>
+      data.reports.find((report) => report.id === selectedReportId) ??
+      data.pendingReports.find((report) => report.id === selectedReportId),
     [data.pendingReports, data.reports, selectedReportId],
   );
 
-  useEffect(() => {
-    window.localStorage.setItem("karuna.baseUrl", baseUrl);
-  }, [baseUrl]);
-
-  useEffect(() => {
-    window.localStorage.setItem("karuna.token", token);
-  }, [token]);
+  useEffect(() => { window.localStorage.setItem("karuna.baseUrl", baseUrl); }, [baseUrl]);
+  useEffect(() => { window.localStorage.setItem("karuna.token", token); }, [token]);
 
   const context = useMemo<RequestContext>(
     () => ({ baseUrl: baseUrl.replace(/\/$/, ""), token, filters }),
@@ -165,7 +209,6 @@ export function AdminDashboard() {
       setMessage("Enter a valid JWT token to fetch backend modules.");
       return;
     }
-
     setLoading(true);
     setMessage("");
     try {
@@ -178,7 +221,12 @@ export function AdminDashboard() {
           : "All backend modules loaded successfully.",
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to refresh backend data.");
+      if (error instanceof Error && error.message === "AUTH_EXPIRED") {
+        handleLogout();
+        setMessage("Session expired or token is invalid. Please log in again.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "Failed to refresh backend data.");
+      }
     } finally {
       setLoading(false);
     }
@@ -199,12 +247,16 @@ export function AdminDashboard() {
             : "All backend modules loaded successfully.",
         );
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Failed to refresh backend data.");
+        if (error instanceof Error && error.message === "AUTH_EXPIRED") {
+          handleLogout();
+          setMessage("Session expired or token is invalid. Please log in again.");
+        } else {
+          setMessage(error instanceof Error ? error.message : "Failed to refresh backend data.");
+        }
       } finally {
         setLoading(false);
       }
     }
-
     void loadInitialData();
   }, [context, token]);
 
@@ -219,13 +271,27 @@ export function AdminDashboard() {
     }
   }
 
+  async function generateAiInsights() {
+    try {
+      setLoading(true);
+      setMessage("AI insight generation in progress...");
+      const aiInsightFeed = await getAiInsightFeed(context);
+      setData((prev) => ({ ...prev, aiInsightFeed }));
+      setMessage("AI insights generated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? `AI insight generation failed: ${error.message}` : "AI insight generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const renderContent = () => {
     switch (activeItem) {
       case "overview":
         return (
-          <div className="flex flex-col gap-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <StatsGrid data={data} />
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: 16 }}>
               <UrgencyPanel
                 mapTasks={data.mapTasks}
                 urgentTasks={data.urgentTasks}
@@ -241,12 +307,53 @@ export function AdminDashboard() {
               />
               <ExplanationPanel selectedTask={selectedTask} selectedReport={selectedReport} />
             </div>
+            {/* Quick Summaries Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+              <QuickSummaryCard
+                title="Mission Status"
+                color="#4285F4"
+                items={[
+                  { label: "Open Urgent Tasks", value: String(data.urgentSummary?.openUrgentTasks ?? 0) },
+                  { label: "Active Volunteers", value: String(data.activeVolunteers.length) },
+                  { label: "Pending Reports", value: String(data.pendingReports.length) },
+                  { label: "Villages Tracked", value: String(data.villageStatus.length) },
+                ]}
+              />
+              <QuickSummaryCard
+                title="AI System Status"
+                color="#0F9D58"
+                items={[
+                  { label: "AI Insights", value: String(data.aiInsightFeed.length) },
+                  { label: "Predictions", value: String(data.predictions.length) },
+                  { label: "AI Logs", value: String(data.aiLogs.length) },
+                  { label: "Audit Entries", value: String(data.auditLogs.length) },
+                ]}
+              />
+              <QuickSummaryCard
+                title="Volunteer Health"
+                color="#F4B400"
+                items={[
+                  { label: "Total Volunteers", value: String(data.volunteers.length) },
+                  { label: "Notifications", value: String(data.notifications.length) },
+                  { label: "Unread Alerts", value: String(data.notifications.filter((n) => !n.readAt).length) },
+                  { label: "Regions", value: String(data.locations.length) },
+                ]}
+              />
+            </div>
           </div>
         );
+
       case "reports":
         return (
-          <div className="flex flex-col gap-6">
-            <div className="grid gap-6 xl:grid-cols-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Report summary pills */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              <MiniStatCard label="Total Reports" value={data.reports.length} color="#4285F4" />
+              <MiniStatCard label="Pending" value={data.pendingReports.length} color="#F4B400" />
+              <MiniStatCard label="Processed" value={data.reports.length - data.pendingReports.length} color="#0F9D58" />
+              <MiniStatCard label="AI Logs" value={data.aiLogs.length} color="#DB4437" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: 16 }}>
               <DataCollectionPanel
                 reports={data.reports}
                 pendingReports={data.pendingReports}
@@ -263,27 +370,37 @@ export function AdminDashboard() {
               <ModernTable
                 title="Recent Reports"
                 columns={[
-                  { header: "ID", accessor: (item) => item.id.slice(0, 8) + "..." },
+                  { header: "ID", accessor: (item) => <span style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "var(--text-secondary)" }}>{(item.id as string).slice(0, 10)}…</span> },
                   { header: "Source", accessor: "source" },
-                  { header: "Status", accessor: (item) => (
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
-                      item.processingStatus === 'PROCESSED' ? 'bg-green-100 text-green-700' : 
-                      item.processingStatus === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {item.processingStatus}
-                    </span>
-                  )},
+                  {
+                    header: "Status",
+                    accessor: (item) => (
+                      <span className={`badge ${
+                        item.processingStatus === "PROCESSED" ? "badge-green" :
+                        item.processingStatus === "FAILED" ? "badge-red" : "badge-blue"
+                      }`}>
+                        {item.processingStatus as string}
+                      </span>
+                    ),
+                  },
                 ]}
                 data={data.reports.slice(0, 10)}
-                onRowClick={(item) => setSelectedReportId(item.id)}
+                onRowClick={(item) => setSelectedReportId(item.id as string)}
               />
             </div>
           </div>
         );
+
       case "tasks":
         return (
-          <div className="flex flex-col gap-6">
-            <div className="grid gap-6 xl:grid-cols-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              <MiniStatCard label="Total Tasks" value={data.tasks.length} color="#4285F4" />
+              <MiniStatCard label="Urgent" value={data.urgentTasks.length} color="#DB4437" />
+              <MiniStatCard label="Volunteers" value={data.volunteers.length} color="#0F9D58" />
+              <MiniStatCard label="Match Suggestions" value={matchSuggestions.length} color="#F4B400" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: 16 }}>
               <MatchingPanel
                 volunteers={data.volunteers}
                 selectedTaskId={selectedTaskId}
@@ -301,23 +418,31 @@ export function AdminDashboard() {
                 title="Active Tasks"
                 columns={[
                   { header: "Title", accessor: "title" },
-                  { header: "Status", accessor: (item) => (
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
-                      item.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {item.status}
-                    </span>
-                  )},
+                  {
+                    header: "Status",
+                    accessor: (item) => (
+                      <span className={`badge ${item.status === "COMPLETED" ? "badge-green" : item.status === "IN_PROGRESS" ? "badge-blue" : "badge-yellow"}`}>
+                        {item.status as string}
+                      </span>
+                    ),
+                  },
                 ]}
                 data={data.tasks.slice(0, 10)}
-                onRowClick={(item) => setSelectedTaskId(item.id)}
+                onRowClick={(item) => setSelectedTaskId(item.id as string)}
               />
             </div>
           </div>
         );
+
       case "volunteers":
         return (
-          <div className="flex flex-col gap-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              <MiniStatCard label="Total Volunteers" value={data.volunteers.length} color="#0F9D58" />
+              <MiniStatCard label="Active Now" value={data.activeVolunteers.length} color="#4285F4" />
+              <MiniStatCard label="Unread Alerts" value={data.notifications.filter((n) => !n.readAt).length} color="#DB4437" />
+              <MiniStatCard label="Regions" value={data.locations.length} color="#F4B400" />
+            </div>
             <EngagementPanel
               activeVolunteers={data.activeVolunteers}
               notificationsUnread={data.notifications.filter((item) => !item.readAt).length}
@@ -327,23 +452,36 @@ export function AdminDashboard() {
               columns={[
                 { header: "Name", accessor: (item) => item.user?.fullName ?? "Unknown" },
                 { header: "Points", accessor: "points" },
-                { header: "Perf", accessor: (item) => item.performanceScore?.toFixed(2) ?? "0.00" },
+                { header: "Performance", accessor: (item) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1, height: 6, background: "var(--bg-muted)", borderRadius: 99, minWidth: 60 }}>
+                      <div style={{ height: "100%", width: `${Math.min(100, (item.performanceScore ?? 0) * 20)}%`, background: "#0F9D58", borderRadius: 99 }} />
+                    </div>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0F9D58" }}>
+                      {item.performanceScore?.toFixed(1) ?? "0.0"}
+                    </span>
+                  </div>
+                )},
               ]}
               data={data.volunteers}
             />
           </div>
         );
+
       case "ai":
         return (
           <InsightDashboard
             insights={data.aiInsightFeed}
-            governanceInsights={data.governanceInsights}
             reports={data.reports}
             tasks={data.tasks}
             villageStatus={data.villageStatus}
+            referenceDataset={data.referenceDataset}
             loading={loading}
+            onGenerateInsights={generateAiInsights}
+            onIngestReferenceData={() => runAction("Reference data ingestion", () => ingestReferenceData(context))}
           />
         );
+
       case "predictions":
         return (
           <PredictionsDashboard
@@ -351,6 +489,7 @@ export function AdminDashboard() {
             onGenerate={() => runAction("Prediction generation", () => generatePredictions(context))}
           />
         );
+
       case "governance":
         return (
           <GovernanceDashboard
@@ -361,8 +500,10 @@ export function AdminDashboard() {
             governanceInsights={data.governanceInsights}
           />
         );
+
       case "audit":
         return <AuditDashboard auditLogs={data.auditLogs} />;
+
       case "impact":
         return (
           <ImpactDashboard
@@ -372,83 +513,110 @@ export function AdminDashboard() {
             governanceInsights={data.governanceInsights}
           />
         );
+
       default:
         return null;
     }
   };
-
-  const pageTitle =
-    {
-      overview: "Overview",
-      reports: "Reports",
-      tasks: "Tasks",
-      volunteers: "Volunteers",
-      ai: "AI Insights",
-      predictions: "Predictions",
-      governance: "Governance",
-      audit: "Audit Logs",
-      impact: "Impact Reports",
-    }[activeItem] ?? "Dashboard";
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} message={message} loading={loading} />;
   }
 
   return (
-    <div className="karuna-shell min-h-screen">
-      <Sidebar
+    <div className="karuna-shell">
+      <TopNav
         activeItem={activeItem}
         onNavigate={setActiveItem}
-        aiSummary={data.aiInsightFeed[0]?.text ?? data.governanceInsights}
+        onRefresh={() => refreshAll()}
+        onLogout={handleLogout}
+        loading={loading}
+        lastRefresh={lastRefresh}
         highUrgencyCount={data.urgentTasks.filter((task) => (task.urgencyScores?.[0]?.score ?? 0) >= 70).length}
       />
-      
-      <main className="lg:ml-64 p-6 md:p-8 lg:p-10">
-        <div className="mx-auto max-w-7xl">
-          <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h1 className="section-title text-3xl font-extrabold tracking-tight text-slate-900">
-                {pageTitle}
-              </h1>
-              <p className="mt-1 text-slate-500">
-                Karuna Mission Control Center · Last sync {lastRefresh}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleLogout}
-                className="btn-premium-secondary flex items-center gap-2"
-              >
-                Logout
-              </button>
-              <button
-                onClick={() => refreshAll()}
-                disabled={loading}
-                className="btn-premium-primary flex items-center gap-2 shadow-sm"
-              >
-                {loading ? "Syncing..." : "Refresh"}
-              </button>
-            </div>
-          </header>
 
-          {message && (
-            <div className="mb-8 animate-fade-in rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-sm text-blue-700 shadow-sm backdrop-blur-md">
-              <div className="flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                <span className="font-medium">{message}</span>
-              </div>
-            </div>
-          )}
+      <main className="page-content">
+        <PageBanner page={activeItem} lastRefresh={lastRefresh} />
 
-          {Object.keys(errors).length > 0 && (
-            <div className="mb-8 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
-              Some modules could not load: {Object.entries(errors).map(([key]) => key).join(", ")}
-            </div>
-          )}
+        {message && (
+          <div className={`msg-bar animate-fade-in ${message.includes("failed") || message.includes("error") ? "msg-bar-error" : "msg-bar-info"}`} style={{ marginBottom: 16 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+            <span style={{ fontWeight: 500 }}>{message}</span>
+          </div>
+        )}
 
-          {renderContent()}
-        </div>
+        {Object.keys(errors).length > 0 && (
+          <div className="msg-bar msg-bar-warn" style={{ marginBottom: 16 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+            <span>Some modules could not load: {Object.entries(errors).map(([key]) => key).join(", ")}</span>
+          </div>
+        )}
+
+        {renderContent()}
       </main>
+    </div>
+  );
+}
+
+/* ─── Inline helper components ─────────────────────────────── */
+
+function MiniStatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  const bgMap: Record<string, string> = {
+    "#4285F4": "#e8f0fe",
+    "#DB4437": "#fce8e6",
+    "#F4B400": "#fef7e0",
+    "#0F9D58": "#e6f4ea",
+  };
+  const bg = bgMap[color] ?? "#f0f0f0";
+  return (
+    <div className="card" style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <span style={{ fontSize: "1.15rem", fontWeight: 800, color }}>{value}</span>
+      </div>
+      <div>
+        <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", fontWeight: 600 }}>{label}</p>
+        <p style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1 }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function QuickSummaryCard({
+  title,
+  color,
+  items,
+}: {
+  title: string;
+  color: string;
+  items: { label: string; value: string }[];
+}) {
+  const bgMap: Record<string, string> = {
+    "#4285F4": "#e8f0fe",
+    "#DB4437": "#fce8e6",
+    "#F4B400": "#fef7e0",
+    "#0F9D58": "#e6f4ea",
+  };
+  return (
+    <div className="card" style={{ padding: 20, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: color }} />
+      <p style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color, marginBottom: 14 }}>
+        {title}
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((item) => (
+          <div key={item.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{item.label}</span>
+            <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)", background: bgMap[color], padding: "2px 10px", borderRadius: 99 }}>
+              {item.value}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

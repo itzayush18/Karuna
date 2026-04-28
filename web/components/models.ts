@@ -150,6 +150,23 @@ export interface AIInsight {
   timestamp: string;
 }
 
+export interface ReferenceDatasetView {
+  id: string;
+  name: string;
+  sourceCount: number;
+  sourceUrls: string[];
+  storageProvider: string;
+  storageKey: string;
+  publicUrl?: string | null;
+  processingStatus: string;
+  summary?: string | null;
+  metadata?: Dict | null;
+  error?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  latestProcessed?: ReferenceDatasetView | null;
+}
+
 export interface AdminDataState {
   urgentSummary: UrgentSummary | null;
   mapTasks: TaskView[];
@@ -172,6 +189,7 @@ export interface AdminDataState {
   aiLogs: Dict[];
   governanceInsights: string;
   aiInsightFeed: AIInsight[];
+  referenceDataset: ReferenceDatasetView | null;
 }
 
 export interface RequestContext {

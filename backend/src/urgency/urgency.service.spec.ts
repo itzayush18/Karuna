@@ -22,7 +22,7 @@ describe('UrgencyService', () => {
           },
         }),
       },
-      urgencyScore: { create: jest.fn((args) => Promise.resolve(args.data)) },
+      urgencyScore: { create: jest.fn((args: { data: unknown }) => Promise.resolve(args.data)) },
     };
     const service = new UrgencyService(prisma as never);
     const result = await service.scoreTask('task-1');

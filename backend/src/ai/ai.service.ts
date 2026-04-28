@@ -12,6 +12,7 @@ type GeminiProvider = 'auto' | 'api_key' | 'vertex';
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private static readonly referenceExtractionTimeoutMs = 120_000;
   private readonly model: string;
   private readonly provider: GeminiProvider;
   private readonly timeoutMs: number;
@@ -246,59 +247,137 @@ export class AiService {
     predictions: any[];
     volunteers: any[];
     auditLogs: any[];
+    referenceData?: any;
   }) {
     if (!this.client) {
-      return this.dashboardInsightFallback(data);
+      this.logger.warn('Gemini client is not configured. No verified dashboard insights were generated.');
+      return [];
     }
 
+    const facts = this.compactDashboardContext(data);
+    const prompt = [
+      'You are Karuna AI. Return minified JSON only. No markdown. No comments. No trailing commas.',
+      'Create exactly 4 dashboard insight cards for NGO coordinators.',
+      'Schema: {"insights":[{"text":"under 22 words","category":"FOOD|WATER|MEDICAL|SHELTER|SANITATION|EDUCATION|TRANSPORT|GOVERNANCE|OTHER","location":"specific place or All locations","confidence":0.0,"severity":"LOW|MEDIUM|HIGH","timestamp":"ISO-8601"}]}',
+      `Allowed categories: ${facts.allowed.categories.join(', ')}`,
+      `Allowed locations: ${facts.allowed.locations.join(', ')}`,
+      'Use only allowed categories and locations. Do not invent exact percentages. Prefer actionable operations insights.',
+      `Current timestamp: ${new Date().toISOString()}`,
+      `Facts: ${JSON.stringify(facts)}`,
+    ].join('\n');
+
+    try {
+      const parsed = await this.requestDashboardInsightJson(prompt);
+      const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
+      const verified = this.groundDashboardInsights(
+        insights.slice(0, 6).map((item, index) => this.normalizeDashboardInsight(item, index)),
+        data,
+      );
+      if (verified.length >= 4) return verified;
+
+      const retryPrompt = [
+        prompt,
+        `Your previous output produced only ${verified.length} validated cards.`,
+        'Regenerate exactly 4 different cards. Every card must use only the allowed categories and allowed locations above.',
+        'Valid example location values include All locations and any exact listed village or district.',
+      ].join('\n');
+      const retried = await this.requestDashboardInsightJson(retryPrompt);
+      const retryInsights = Array.isArray(retried.insights) ? retried.insights : [];
+      return this.groundDashboardInsights(
+        retryInsights.slice(0, 6).map((item, index) => this.normalizeDashboardInsight(item, index)),
+        data,
+      );
+    } catch (error) {
+      this.logger.warn(`Dashboard insight generation failed: ${this.sanitizeError(error)}`);
+      return [];
+    }
+  }
+
+  async extractInsightReferenceFromPdf(source: {
+    title: string;
+    description?: string;
+    url: string;
+    kind: string;
+    mimeType: string;
+    dataBase64: string;
+  }) {
+    if (!this.client) return this.referenceExtractionFallback(source);
+
     const prompt = `
-      You are Karuna's AI operations analyst for an NGO coordination dashboard.
-      Create concise, decision-ready insight cards for non-technical coordinators.
+      You are extracting reusable needs-assessment data for Karuna, an NGO resource-allocation dashboard.
+      Extract only the information useful for generating operational insights from community reports and tasks.
 
       Return ONLY valid JSON with this exact shape:
       {
-        "insights": [
+        "sourceTitle": "string",
+        "sourceKind": "survey | report | annual_report | baseline | questionnaire | other",
+        "summary": "short factual summary",
+        "geographies": ["places covered or implied"],
+        "populationGroups": ["groups covered"],
+        "needDomains": [
           {
-            "text": "one actionable observation under 28 words",
-            "category": "FOOD | WATER | MEDICAL | SHELTER | SANITATION | EDUCATION | TRANSPORT | GOVERNANCE | OTHER",
-            "location": "specific village/district or All locations",
-            "confidence": 0.0,
-            "severity": "LOW | MEDIUM | HIGH",
-            "timestamp": "ISO-8601 timestamp"
+            "name": "domain name",
+            "indicators": ["measurable signs"],
+            "questions": ["useful survey questions"],
+            "operationalUse": "how Karuna should use it"
           }
-        ]
+        ],
+        "vulnerableGroups": ["groups to watch"],
+        "urgencySignals": ["signals that should raise urgency"],
+        "recommendedInsightRules": ["practical rules for dashboard insights"],
+        "confidence": 0.0
       }
 
-      Rules:
-      - Provide exactly 4 insight cards.
-      - Keep every text field under 22 words.
-      - Prefer patterns, changes, risk concentrations, fairness concerns, and operational bottlenecks.
-      - Do not invent exact percentage changes unless directly implied by the data.
-      - Use neutral language and practical recommendations.
-
-      DATA:
-      ${JSON.stringify(data).slice(0, 16000)}
+      Source title: ${source.title}
+      Source kind: ${source.kind}
+      Source description: ${source.description ?? ''}
+      Source URL: ${source.url}
     `;
 
     try {
-      const response = await this.callGeminiWithRetry({
-        model: this.model,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: this.dashboardInsightSchema() as never,
-          temperature: 0.35,
-          maxOutputTokens: 2400,
-        },
-      } as never);
+      const response = await this.callGeminiWithRetry(
+        {
+          model: this.model,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: source.mimeType, data: source.dataBase64 } },
+              ],
+            },
+          ],
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.referenceExtractionSchema() as never,
+            temperature: 0.2,
+            maxOutputTokens: 4096,
+          },
+        } as never,
+        Math.max(this.timeoutMs, AiService.referenceExtractionTimeoutMs),
+      );
 
-      const parsed = this.parseJsonResponse(response.text ?? '{"insights":[]}') as { insights?: unknown[] };
-      const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
-      return insights.slice(0, 6).map((item, index) => this.normalizeDashboardInsight(item, index));
+      return this.normalizeReferenceExtraction(await this.parseReferenceExtractionResponse(response.text ?? '', source), source);
     } catch (error) {
-      this.logger.warn(`Dashboard insight generation fell back: ${this.sanitizeError(error)}`);
-      return this.dashboardInsightFallback(data);
+      this.logger.warn(`Reference PDF extraction fell back for ${source.url}: ${this.sanitizeError(error)}`);
+      return this.referenceExtractionFallback(source);
     }
+  }
+
+  summarizeReferenceDataset(extractions: any[]) {
+    const domains = this.topCount(
+      extractions.flatMap((item) => Array.isArray(item.needDomains) ? item.needDomains.map((domain: any) => String(domain.name)) : []),
+    );
+    const vulnerableGroups = [...new Set(extractions.flatMap((item) => item.vulnerableGroups ?? []))].slice(0, 12);
+    const urgencySignals = [...new Set(extractions.flatMap((item) => item.urgencySignals ?? []))].slice(0, 12);
+
+    return {
+      sourceCount: extractions.length,
+      topDomain: domains.label,
+      vulnerableGroups,
+      urgencySignals,
+      summary: `Reference dataset prepared from ${extractions.length} needs-assessment PDFs. Top extracted domain: ${domains.label}.`,
+    };
   }
 
   private async extractWithGemini(report: {
@@ -343,7 +422,145 @@ export class AiService {
       location: String(value.location ?? 'All locations').slice(0, 120),
       confidence: Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0.6)),
       severity: ['LOW', 'MEDIUM', 'HIGH'].includes(severity) ? severity : 'MEDIUM',
-      timestamp: String(value.timestamp ?? new Date().toISOString()),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private async requestDashboardInsightJson(prompt: string) {
+    const response = await this.callGeminiWithRetry({
+      model: this.model,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseJsonSchema: this.dashboardInsightSchema() as never,
+        temperature: 0,
+        maxOutputTokens: 1200,
+      },
+    } as never);
+
+    return this.parseDashboardInsightResponse(response.text ?? '{"insights":[]}');
+  }
+
+  private groundDashboardInsights(
+    insights: Array<ReturnType<AiService['normalizeDashboardInsight']>>,
+    data: {
+      reports: any[];
+      tasks: any[];
+      predictions: any[];
+      volunteers: any[];
+      auditLogs: any[];
+    },
+  ) {
+    const allowedLocations = new Set([
+      'All locations',
+      ...data.tasks.flatMap((task) => [
+        String(task.location?.village ?? '').trim(),
+        String(task.location?.district ?? '').trim(),
+      ]),
+      ...data.reports.flatMap((report) => [
+        String(report.location?.village ?? '').trim(),
+        String(report.location?.district ?? '').trim(),
+      ]),
+      ...data.predictions.flatMap((prediction) => [
+        String(prediction.location?.village ?? '').trim(),
+        String(prediction.location?.district ?? '').trim(),
+      ]),
+    ].filter(Boolean));
+    const allowedCategories = new Set([
+      'GOVERNANCE',
+      'OTHER',
+      ...data.tasks.map((task) => String(task.category ?? '').toUpperCase()).filter(Boolean),
+      ...data.predictions.map((prediction) => String(prediction.type ?? '').replace(/_.*/, '').toUpperCase()).filter(Boolean),
+    ]);
+    return insights
+      .filter((insight) => allowedLocations.has(insight.location) && allowedCategories.has(insight.category))
+      .map((insight) => ({ ...insight, timestamp: new Date().toISOString() }))
+      .slice(0, 4);
+  }
+
+  private compactDashboardContext(data: {
+    reports: any[];
+    tasks: any[];
+    predictions: any[];
+    volunteers: any[];
+    auditLogs: any[];
+    referenceData?: any;
+  }) {
+    const openTasks = data.tasks.filter((task) => ['OPEN', 'ASSIGNED', 'IN_PROGRESS'].includes(String(task.status)));
+    const topCategory = this.topCount(data.tasks.map((task) => String(task.category ?? 'OTHER')));
+    const topLocation = this.topCount(
+      data.tasks.map((task) => String(task.location?.village ?? task.location?.district ?? 'All locations')),
+    );
+    const allowedLocations = [
+      'All locations',
+      ...new Set(
+        [
+          ...data.tasks.flatMap((task) => [task.location?.village, task.location?.district]),
+          ...data.reports.flatMap((report) => [report.location?.village, report.location?.district]),
+          ...data.predictions.flatMap((prediction) => [prediction.location?.village, prediction.location?.district]),
+        ]
+          .map((item) => String(item ?? '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const allowedCategories = [
+      'GOVERNANCE',
+      'OTHER',
+      ...new Set(
+        [
+          ...data.tasks.map((task) => String(task.category ?? '').toUpperCase()),
+          ...data.predictions.map((prediction) => String(prediction.type ?? '').replace(/_.*/, '').toUpperCase()),
+        ].filter(Boolean),
+      ),
+    ];
+    return {
+      allowed: {
+        categories: allowedCategories,
+        locations: allowedLocations,
+        severities: ['LOW', 'MEDIUM', 'HIGH'],
+      },
+      counts: {
+        reports: data.reports.length,
+        tasks: data.tasks.length,
+        openTasks: openTasks.length,
+        predictions: data.predictions.length,
+        volunteers: data.volunteers.length,
+        auditLogs: data.auditLogs.length,
+      },
+      topCategory,
+      topLocation,
+      highUrgencyTasks: openTasks
+        .filter((task) => (task.urgencyScores?.[0]?.score ?? 0) >= 70)
+        .slice(0, 8)
+        .map((task) => ({
+          title: task.title,
+          category: task.category,
+          status: task.status,
+          affectedPeople: task.affectedPeople,
+          location: task.location?.village ?? task.location?.district ?? 'All locations',
+          urgencyScore: task.urgencyScores?.[0]?.score,
+        })),
+      recentReports: data.reports.slice(0, 8).map((report) => ({
+        source: report.source,
+        status: report.processingStatus,
+        summary: report.extracted?.summary ?? report.rawText?.slice?.(0, 120),
+        location: report.location?.village ?? report.location?.district,
+      })),
+      activePredictions: data.predictions.slice(0, 6).map((prediction) => ({
+        type: prediction.type,
+        title: prediction.title,
+        confidence: prediction.confidence,
+        location: prediction.location?.village ?? prediction.location?.district ?? 'All locations',
+      })),
+      reference: data.referenceData
+        ? {
+            summary: data.referenceData.summary,
+            topDomain: data.referenceData.topDomain,
+            vulnerableGroups: data.referenceData.vulnerableGroups?.slice?.(0, 8),
+            urgencySignals: data.referenceData.urgencySignals?.slice?.(0, 8),
+            insightRules: data.referenceData.insightRules?.slice?.(0, 8),
+          }
+        : undefined,
     };
   }
 
@@ -376,13 +593,221 @@ export class AiService {
     };
   }
 
+  private referenceExtractionSchema() {
+    const strings = { type: 'array', items: { type: 'string' } };
+    return {
+      type: 'object',
+      properties: {
+        sourceTitle: { type: 'string' },
+        sourceKind: { type: 'string' },
+        summary: { type: 'string' },
+        geographies: strings,
+        populationGroups: strings,
+        needDomains: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              indicators: strings,
+              questions: strings,
+              operationalUse: { type: 'string' },
+            },
+            required: ['name', 'indicators', 'questions', 'operationalUse'],
+          },
+        },
+        vulnerableGroups: strings,
+        urgencySignals: strings,
+        recommendedInsightRules: strings,
+        confidence: { type: 'number' },
+      },
+      required: [
+        'sourceTitle',
+        'sourceKind',
+        'summary',
+        'geographies',
+        'populationGroups',
+        'needDomains',
+        'vulnerableGroups',
+        'urgencySignals',
+        'recommendedInsightRules',
+        'confidence',
+      ],
+    };
+  }
+
+  private normalizeReferenceExtraction(payload: unknown, source: { title: string; kind: string; url: string }) {
+    const value = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    return {
+      sourceTitle: String(value.sourceTitle ?? source.title).slice(0, 180),
+      sourceKind: String(value.sourceKind ?? source.kind).slice(0, 40),
+      sourceUrl: source.url,
+      summary: String(value.summary ?? '').slice(0, 700),
+      geographies: this.stringList(value.geographies, 20),
+      populationGroups: this.stringList(value.populationGroups, 20),
+      needDomains: Array.isArray(value.needDomains)
+        ? value.needDomains.slice(0, 16).map((item) => {
+            const domain = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+            return {
+              name: String(domain.name ?? 'Other').slice(0, 120),
+              indicators: this.stringList(domain.indicators, 20),
+              questions: this.stringList(domain.questions, 20),
+              operationalUse: String(domain.operationalUse ?? '').slice(0, 400),
+            };
+          })
+        : [],
+      vulnerableGroups: this.stringList(value.vulnerableGroups, 24),
+      urgencySignals: this.stringList(value.urgencySignals, 24),
+      recommendedInsightRules: this.stringList(value.recommendedInsightRules, 20),
+      confidence: Math.max(0, Math.min(1, Number(value.confidence ?? 0.5))),
+    };
+  }
+
+  private referenceExtractionFallback(source: { title: string; description?: string; url: string; kind: string }, modelText = '') {
+    const text = `${source.title} ${source.description ?? ''} ${modelText}`.toLowerCase();
+    const modelSummary = modelText.replace(/\s+/g, ' ').trim().slice(0, 650);
+    const domains = [
+      text.includes('health') || text.includes('nutrition') || text.includes('family planning')
+        ? {
+            name: 'Health and nutrition',
+            indicators: ['illness burden', 'health service access', 'nutrition risk', 'maternal and child health'],
+            questions: ['Which health services are difficult to access?', 'Are children, pregnant women, elderly people, or medically fragile people affected?'],
+            operationalUse: 'Raise urgency when health access issues overlap with vulnerable groups.',
+          }
+        : null,
+      text.includes('livelihood') || text.includes('consumption') || text.includes('baseline')
+        ? {
+            name: 'Livelihoods and household economy',
+            indicators: ['income loss', 'food insecurity', 'debt pressure', 'asset loss'],
+            questions: ['Which essentials could not be met recently?', 'What livelihood shock affected the household?'],
+            operationalUse: 'Flag repeated food, cash, or livelihood gaps as recurring vulnerability.',
+          }
+        : null,
+      text.includes('village') || text.includes('community') || text.includes('disaster')
+        ? {
+            name: 'Community infrastructure and disaster risk',
+            indicators: ['water access', 'sanitation gap', 'transport isolation', 'disaster exposure'],
+            questions: ['Which public services are missing or unreliable?', 'What hazards disrupt access to services?'],
+            operationalUse: 'Use service gaps and isolation as context for task severity.',
+          }
+        : null,
+    ].filter(Boolean);
+
+    return this.normalizeReferenceExtraction({
+      sourceTitle: source.title,
+      sourceKind: source.kind,
+      summary: modelSummary || `${source.title} was included as a reference source for needs-assessment insight generation.`,
+      geographies: text.includes('india') ? ['India'] : [],
+      populationGroups: ['households', 'communities', 'vulnerable groups'],
+      needDomains: domains.length ? domains : [
+        {
+          name: 'General community needs',
+          indicators: ['reported need', 'affected people', 'severity', 'service gap'],
+          questions: ['What is the most urgent need?', 'How many people are affected?', 'Which groups are vulnerable?'],
+          operationalUse: 'Use as baseline structure for interpreting community reports.',
+        },
+      ],
+      vulnerableGroups: ['children', 'elderly people', 'women', 'medically fragile people', 'low-income households'],
+      urgencySignals: ['large affected population', 'vulnerable groups', 'health risk', 'recurring issue', 'service disruption'],
+      recommendedInsightRules: ['Highlight needs affecting vulnerable groups', 'Treat recurring unresolved issues as higher priority'],
+      confidence: 0.3,
+    }, source);
+  }
+
+  private stringList(value: unknown, limit: number) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => String(item ?? '').trim()).filter(Boolean).slice(0, limit);
+  }
+
   private parseJsonResponse(text: string) {
     try {
       return JSON.parse(text);
     } catch {
       const match = text.match(/\{[\s\S]*\}/);
       if (!match) throw new Error(`Gemini returned an incomplete or non-JSON insight response (${text.length} chars)`);
-      return JSON.parse(match[0]);
+      return JSON.parse(this.repairJsonText(match[0]));
+    }
+  }
+
+  private async parseDashboardInsightResponse(text: string): Promise<{ insights?: unknown[] }> {
+    try {
+      return this.parseJsonResponse(text) as { insights?: unknown[] };
+    } catch (error) {
+      if (!this.client || !text.trim()) throw error;
+
+      const repairPrompt = [
+        'Repair this into ONLY valid JSON for Karuna dashboard insight cards.',
+        'Do not return markdown. Do not add commentary.',
+        'Return exactly this shape: {"insights":[{"text":"...","category":"FOOD|WATER|MEDICAL|SHELTER|SANITATION|EDUCATION|TRANSPORT|GOVERNANCE|OTHER","location":"...","confidence":0.0,"severity":"LOW|MEDIUM|HIGH","timestamp":"ISO-8601"}]}',
+        'Keep exactly 4 insight objects. If a field is missing, infer a conservative value.',
+        `Broken JSON:\n${text.slice(0, 8000)}`,
+      ].join('\n');
+
+      const repaired = await this.callGeminiWithRetry(
+        {
+          model: this.model,
+          contents: [{ role: 'user', parts: [{ text: repairPrompt }] }],
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.dashboardInsightSchema() as never,
+            temperature: 0,
+            maxOutputTokens: 1800,
+          },
+        } as never,
+        Math.max(this.timeoutMs, 45_000),
+      );
+
+      return this.parseJsonResponse(repaired.text ?? '{"insights":[]}') as { insights?: unknown[] };
+    }
+  }
+
+  private repairJsonText(text: string) {
+    return text
+      .replace(/```(?:json)?/gi, '')
+      .replace(/```/g, '')
+      .replace(/,\s*([}\]])/g, '$1')
+      .trim();
+  }
+
+  private async parseReferenceExtractionResponse(
+    text: string,
+    source: { title: string; description?: string; url: string; kind: string },
+  ) {
+    try {
+      return this.parseJsonResponse(text);
+    } catch {
+      if (!this.client || !text.trim()) return this.referenceExtractionFallback(source, text);
+    }
+
+    try {
+      const repairPrompt = [
+        'Convert this model output into ONLY valid JSON for Karuna reference extraction.',
+        'Use the source metadata when the output is incomplete. Do not return markdown.',
+        'Required keys: sourceTitle, sourceKind, summary, geographies, populationGroups, needDomains, vulnerableGroups, urgencySignals, recommendedInsightRules, confidence.',
+        `Source title: ${source.title}`,
+        `Source kind: ${source.kind}`,
+        `Source description: ${source.description ?? ''}`,
+        `Source URL: ${source.url}`,
+        `Model output to repair:\n${text.slice(0, 12000)}`,
+      ].join('\n');
+
+      const repaired = await this.callGeminiWithRetry(
+        {
+          model: this.model,
+          contents: [{ role: 'user', parts: [{ text: repairPrompt }] }],
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.referenceExtractionSchema() as never,
+            temperature: 0,
+            maxOutputTokens: 4096,
+          },
+        } as never,
+        Math.max(this.timeoutMs, 45_000),
+      );
+
+      return this.parseJsonResponse(repaired.text ?? '{}');
+    } catch {
+      return this.referenceExtractionFallback(source, text);
     }
   }
 
@@ -463,14 +888,14 @@ export class AiService {
     ].join(' ');
   }
 
-  private async callGeminiWithRetry(request: unknown) {
+  private async callGeminiWithRetry(request: unknown, timeoutMs = this.timeoutMs) {
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const response = await this.withTimeout(
           this.client!.models.generateContent(request as never),
-          this.timeoutMs,
-          `Gemini request timed out after ${this.timeoutMs}ms`,
+          timeoutMs,
+          `Gemini request timed out after ${timeoutMs}ms`,
         );
         return response;
       } catch (error) {

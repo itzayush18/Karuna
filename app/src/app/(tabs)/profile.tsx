@@ -92,7 +92,7 @@ export default function ProfileScreen() {
               <Text style={[styles.coachTitle, { color: themeColors.text }]}>Daily Tip</Text>
             </View>
             <Text style={[styles.coachMessage, { color: themeColors.textSecondary }]}>
-              "Great job {localName.split(' ')[0]}! You helped 12 families last week. There's a small task near your route home today, want to check it out?"
+              {`"Great job ${localName.split(' ')[0]}! You helped 12 families last week. There's a small task near your route home today, want to check it out?"`}
             </Text>
           </Card>
 

@@ -91,7 +91,7 @@ export default function LoginScreen() {
             )}
 
             <TouchableOpacity style={styles.switchContainer} onPress={() => router.push('/signup')}>
-              <Text style={styles.switchText}>Don't have an account? <Text style={{ color: GoogleColors.red, fontFamily: 'Poppins_700Bold' }}>Sign Up</Text></Text>
+              <Text style={styles.switchText}>{"Don't have an account? "}<Text style={{ color: GoogleColors.red, fontFamily: 'Poppins_700Bold' }}>Sign Up</Text></Text>
             </TouchableOpacity>
 
           </View>

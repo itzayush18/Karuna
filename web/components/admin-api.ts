@@ -64,20 +64,50 @@ export async function apiPost<T>(ctx: RequestContext, path: string, body?: unkno
 
 export async function authLogin(baseUrl: string, credentials: { email: string; password?: string }) {
   if (!credentials.password) throw new Error("Password is required");
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
+  let firebaseFailure = "";
 
-  const firebaseCredential = await signInWithEmailAndPassword(getFirebaseAuth(), credentials.email, credentials.password);
-  const idToken = await firebaseCredential.user.getIdToken();
+  const isSeededLocalAccount = credentials.email.toLowerCase().endsWith("@karuna.local");
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/auth/firebase/login`, {
+  if (!isSeededLocalAccount) {
+    try {
+      const firebaseCredential = await signInWithEmailAndPassword(getFirebaseAuth(), credentials.email, credentials.password);
+      const idToken = await firebaseCredential.user.getIdToken();
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/auth/firebase/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+        cache: "no-store",
+      });
+
+      return await parseResponse<{ accessToken: string }>(response);
+    } catch (firebaseError) {
+      firebaseFailure = firebaseError instanceof Error ? firebaseError.message : "Firebase login failed";
+      console.info("Firebase login failed; falling back to backend password login.", firebaseError);
+    }
+  }
+
+  const response = await fetch(`${normalizedBaseUrl}/api/v1/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ email: credentials.email, password: credentials.password }),
     cache: "no-store",
   });
 
-  return parseResponse<{ accessToken: string }>(response);
+  try {
+    return await parseResponse<{ accessToken: string }>(response);
+  } catch (fallbackError) {
+    const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : "Backend password login failed";
+    throw new Error(
+      isSeededLocalAccount
+        ? `Demo login failed. Use admin@karuna.local with Password123!. Backend: ${fallbackMessage}`
+        : `Login failed. Firebase: ${firebaseFailure || "not attempted"}. Backend fallback: ${fallbackMessage}`,
+    );
+  }
 }
 
 export async function authGoogleLogin(baseUrl: string) {
@@ -120,6 +150,7 @@ export async function loadAdminData(ctx: RequestContext) {
     locations: () => apiGet<AdminDataState["locations"]>(ctx, "/locations"),
     auditLogs: () => apiGet<AdminDataState["auditLogs"]>(ctx, "/audit-logs"),
     aiLogs: () => apiGet<AdminDataState["aiLogs"]>(ctx, "/ai/logs"),
+    referenceDataset: () => apiGet<AdminDataState["referenceDataset"]>(ctx, "/analytics/reference-data", {}),
   };
 
   const keys = Object.keys(operations) as Array<keyof typeof operations>;
@@ -165,6 +196,10 @@ export async function getGovernanceInsights(ctx: RequestContext) {
 
 export async function getAiInsightFeed(ctx: RequestContext) {
   return apiGet<AdminDataState["aiInsightFeed"]>(ctx, "/analytics/ai-insight-feed");
+}
+
+export async function ingestReferenceData(ctx: RequestContext) {
+  return apiPost<AdminDataState["referenceDataset"]>(ctx, "/analytics/reference-data/ingest");
 }
 
 export async function markNotificationRead(ctx: RequestContext, id: string) {

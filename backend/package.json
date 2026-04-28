@@ -11,10 +11,11 @@
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"prisma/**/*.ts\"",
     "test": "jest --watchman=false --runInBand",
-    "test:e2e": "jest --watchman=false --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
+    "prisma:reset": "prisma db push --force-reset && npm run prisma:seed",
+    "db:reset": "npm run prisma:reset",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts"
   },
@@ -48,6 +49,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/schematics": "^11.1.0",
     "@nestjs/testing": "^11.1.19",
@@ -71,7 +73,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -10,7 +10,7 @@ describe('ReportsService', () => {
     const service = new ReportsService(prisma as never, {} as never, {} as never);
     const result = await service.sync(
       { idempotencyKey: 'abc', source: 'SYNC' as never, rawText: 'hello' },
-      { sub: 'user-1', email: 'a@b.com', role: 'FIELD_WORKER' },
+      { id: 'user-1', sub: 'user-1', email: 'a@b.com', role: 'FIELD_WORKER' },
     );
 
     expect(result.duplicate).toBe(true);

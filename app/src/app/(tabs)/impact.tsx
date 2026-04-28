@@ -73,7 +73,7 @@ export default function ImpactScreen() {
                 {summary ? `Identified ${summary.totalTasks || 0} urgent community tasks affecting ${summary.totalAffectedPeople || 0} individuals.` : 'Waiting for community data...'}
               </Text>
               <Text style={[styles.storySub, { color: themeColors.textSecondary }]}>
-                Together we're ensuring that the most critical needs are met. Real-time data keeps volunteers where they're needed most.
+                {"Together we're ensuring that the most critical needs are met. Real-time data keeps volunteers where they're needed most."}
               </Text>
               <View style={styles.storyFooter}>
                 <View style={styles.faceGroup}>

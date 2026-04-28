@@ -2,7 +2,8 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createReadStream } from 'node:fs';
-import { basename, join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 
 export type StoredObject = {
   provider: 'local' | 'cloudflare-r2';
@@ -56,6 +57,44 @@ export class StorageService {
       path: file.path,
       url: publicBaseUrl ? `${publicBaseUrl.replace(/\/$/, '')}/${key}` : undefined,
       sizeBytes: file.size,
+    };
+  }
+
+  async storeJsonObject(key: string, data: unknown): Promise<StoredObject> {
+    const buffer = Buffer.from(JSON.stringify(data, null, 2));
+    if (!this.r2Client) {
+      const uploadDir = this.config.get<string>('uploads.dir', 'uploads');
+      const localPath = join(uploadDir, key);
+      await mkdir(dirname(localPath), { recursive: true });
+      await writeFile(localPath, buffer);
+      return {
+        provider: 'local',
+        key,
+        path: localPath,
+        url: join('/uploads', key),
+        sizeBytes: buffer.length,
+      };
+    }
+
+    const bucket = this.config.getOrThrow<string>('r2.bucket');
+    await this.r2Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/json',
+        ContentLength: buffer.length,
+      }),
+    );
+
+    const publicBaseUrl = this.config.get<string>('r2.publicBaseUrl');
+    return {
+      provider: 'cloudflare-r2',
+      bucket,
+      key,
+      path: key,
+      url: publicBaseUrl ? `${publicBaseUrl.replace(/\/$/, '')}/${key}` : undefined,
+      sizeBytes: buffer.length,
     };
   }
 

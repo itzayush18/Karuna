@@ -1,18 +1,24 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ProcessingStatus, ReportSource } from '@prisma/client';
+import { AiService } from '../ai/ai.service';
 import { existsSync, mkdirSync } from 'node:fs';
 import { extname } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
+import { UrgencyService } from '../urgency/urgency.service';
 import { allowedMediaMimeTypes, mediaTypeFromMime } from './media.constants';
 import { StorageService } from './storage.service';
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly ai: AiService,
+    private readonly urgency: UrgencyService,
   ) {}
 
   uploadOptions() {
@@ -59,10 +65,11 @@ export class MediaService {
     await this.prisma.communityReport.update({
       where: { id: reportId },
       data: {
-        source: mediaType === 'image' ? ReportSource.IMAGE : ReportSource.AUDIO,
+        source: this.reportSourceForMedia(mediaType),
         processingStatus: ProcessingStatus.UPLOADED,
       },
     });
+    void this.processMediaReport(reportId);
     return media;
   }
 
@@ -83,5 +90,37 @@ export class MediaService {
         },
       },
     });
+  }
+
+  private reportSourceForMedia(mediaType: string) {
+    if (mediaType === 'image') return ReportSource.IMAGE;
+    if (mediaType === 'audio') return ReportSource.AUDIO;
+    return ReportSource.FORM;
+  }
+
+  private async processMediaReport(reportId: string) {
+    try {
+      const existingTask = await this.prisma.task.findFirst({ where: { reportId } });
+      const extracted = await this.ai.processReport(reportId);
+      if (existingTask) return;
+
+      const report = await this.prisma.communityReport.findUniqueOrThrow({ where: { id: reportId } });
+      const task = await this.prisma.task.create({
+        data: {
+          reportId,
+          organizationId: report.organizationId,
+          locationId: report.locationId,
+          title: `${extracted.category.toLowerCase()} support needed`,
+          description: extracted.summary,
+          category: extracted.category,
+          affectedPeople: extracted.affectedPeople,
+          requiredVolunteers: Math.max(1, Math.ceil(extracted.affectedPeople / 25)),
+        },
+      });
+      await this.urgency.scoreTask(task.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'media report processing failed';
+      this.logger.warn(`Media report processing failed for ${reportId}: ${message}`);
+    }
   }
 }

@@ -5,9 +5,13 @@ import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { StorageService } from './storage.service';
 import { allowedMediaMimeTypes } from './media.constants';
+import { AiModule } from '../ai/ai.module';
+import { UrgencyModule } from '../urgency/urgency.module';
 
 @Module({
   imports: [
+    AiModule,
+    UrgencyModule,
     MulterModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

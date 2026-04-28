@@ -79,12 +79,18 @@ export function Sidebar({ activeItem, onNavigate, aiSummary, highUrgencyCount = 
   ];
 
   return (
-    <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-(--line)] bg-white px-4 py-8 lg:flex">
-      <div className="mb-8 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200">
+    <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-6 text-white lg:flex">
+      <div className="mb-6 grid h-1.5 grid-cols-4 overflow-hidden rounded-full">
+        <span style={{ backgroundColor: "#4285F4" }} />
+        <span style={{ backgroundColor: "#DB4437" }} />
+        <span style={{ backgroundColor: "#F4B400" }} />
+        <span style={{ backgroundColor: "#0F9D58" }} />
+      </div>
+      <div className="mb-7 flex items-center gap-3 px-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg text-white shadow-lg" style={{ backgroundColor: "#4285F4" }}>
           <span className="text-xl font-bold">K</span>
         </div>
-        <span className="section-title text-xl font-bold tracking-tight text-slate-900">Karuna Admin</span>
+        <span className="section-title text-xl font-bold tracking-tight text-white">Karuna Admin</span>
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -100,22 +106,22 @@ export function Sidebar({ activeItem, onNavigate, aiSummary, highUrgencyCount = 
         ))}
       </nav>
 
-      <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+      <div className="mb-4 rounded-lg border border-blue-400/30 bg-blue-400/10 p-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">AI Signal</p>
-          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-blue-700">{highUrgencyCount} high</span>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">AI Signal</p>
+          <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-blue-100">{highUrgencyCount} high</span>
         </div>
-        <p className="line-clamp-4 text-xs leading-5 text-slate-700">
+        <p className="line-clamp-4 text-xs leading-5 text-slate-200">
           {aiSummary || "Refresh the dashboard to generate coordinator insights."}
         </p>
       </div>
 
-      <div className="mt-auto rounded-2xl bg-slate-50 p-4">
+      <div className="mt-auto rounded-lg border border-white/10 bg-white/5 p-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-slate-200" />
+          <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: "#0F9D58" }} />
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-semibold text-slate-900">Admin User</p>
-            <p className="truncate text-xs text-slate-500">admin@karuna.org</p>
+            <p className="truncate text-sm font-semibold text-white">Admin User</p>
+            <p className="truncate text-xs text-slate-400">admin@karuna.org</p>
           </div>
         </div>
       </div>
